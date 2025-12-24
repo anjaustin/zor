@@ -1,0 +1,180 @@
+{
+  "timestamp": "2025-12-23T07:40:15.761670",
+  "config": {
+    "d_model": 128,
+    "num_tiles": 16,
+    "grid_size": 16,
+    "batch_sizes": [
+      100,
+      1000,
+      10000
+    ],
+    "tolerance_float32": 1e-05,
+    "tolerance_int8": 0.02,
+    "random_seed": 42
+  },
+  "tests": [
+    {
+      "name": "test_pack_unpack_roundtrip",
+      "status": "PASSED",
+      "details": {
+        "d_model": 128,
+        "packed_size_bytes": 32
+      }
+    },
+    {
+      "name": "test_compression_ratio",
+      "status": "PASSED",
+      "details": {
+        "float32_bytes": 8192,
+        "packed_bytes": 512,
+        "compression": 16.0
+      }
+    },
+    {
+      "name": "test_quantization_error",
+      "status": "PASSED",
+      "details": {
+        "max_absolute_error": 0.0006064868648536503,
+        "mean_absolute_error": 0.00030058634001761675,
+        "quantization_scale": 0.0006067293483441271,
+        "expected_max_error": 0.0006067293483441271
+      }
+    },
+    {
+      "name": "test_output_shape",
+      "status": "PASSED",
+      "details": {
+        "batch_sizes_tested": [
+          100,
+          1000,
+          10000
+        ]
+      }
+    },
+    {
+      "name": "test_output_finite",
+      "status": "PASSED",
+      "details": {
+        "batch_sizes_tested": [
+          100,
+          1000,
+          10000
+        ]
+      }
+    },
+    {
+      "name": "test_deterministic",
+      "status": "PASSED",
+      "details": {
+        "max_difference": 0.0
+      }
+    },
+    {
+      "name": "test_residual_connection",
+      "status": "PASSED",
+      "details": {
+        "mean_absolute_change": 0.0,
+        "input_magnitude": 0.0,
+        "relative_change": 0.0
+      }
+    },
+    {
+      "name": "test_vectorized_matches_standard",
+      "status": "PASSED",
+      "details": {
+        "max_difference": 0.0,
+        "mean_difference": 0.0
+      }
+    },
+    {
+      "name": "test_bspline_properties",
+      "status": "PASSED",
+      "details": {
+        "peak_value": 0.6666576621802117,
+        "peak_location": -0.0030030030030028243
+      }
+    },
+    {
+      "name": "test_throughput_measurement",
+      "status": "PASSED",
+      "details": {
+        "benchmarks": [
+          {
+            "batch_size": 1000,
+            "best_time_ms": 0.09571301052346826,
+            "mean_time_ms": 0.10094539902638644,
+            "std_time_ms": 0.006987695329378987,
+            "throughput_tokens_per_sec": 10447900.390248472,
+            "throughput_m_per_sec": 10.447900390248472
+          },
+          {
+            "batch_size": 10000,
+            "best_time_ms": 0.14391700096894056,
+            "mean_time_ms": 0.14664439804619178,
+            "std_time_ms": 0.0029249550909387907,
+            "throughput_tokens_per_sec": 69484494.0672308,
+            "throughput_m_per_sec": 69.48449406723081
+          },
+          {
+            "batch_size": 100000,
+            "best_time_ms": 2.113138005370274,
+            "mean_time_ms": 2.256993499759119,
+            "std_time_ms": 0.1456175024506835,
+            "throughput_tokens_per_sec": 47322985.88443471,
+            "throughput_m_per_sec": 47.32298588443471
+          },
+          {
+            "batch_size": 500000,
+            "best_time_ms": 9.120394999627024,
+            "mean_time_ms": 9.46377929940354,
+            "std_time_ms": 0.3967791212343246,
+            "throughput_tokens_per_sec": 54822186.97988929,
+            "throughput_m_per_sec": 54.82218697988929
+          }
+        ]
+      }
+    },
+    {
+      "name": "test_memory_usage",
+      "status": "PASSED",
+      "details": {
+        "batch_size": 100000,
+        "input_memory_mb": 0.73728,
+        "output_memory_mb": 0.0,
+        "total_memory_mb": 0.73728
+      }
+    },
+    {
+      "name": "test_speedup_measurement",
+      "status": "PASSED",
+      "details": {
+        "speedups": [
+          {
+            "batch_size": 1000,
+            "pytorch_time_ms": 10.408949994598515,
+            "emergence_time_ms": 0.14459199155680835,
+            "speedup": 71.98842676227315
+          },
+          {
+            "batch_size": 10000,
+            "pytorch_time_ms": 10.863155010156333,
+            "emergence_time_ms": 0.14870399900246412,
+            "speedup": 73.052204937517
+          },
+          {
+            "batch_size": 100000,
+            "pytorch_time_ms": 17.505819007055834,
+            "emergence_time_ms": 2.1024250017944723,
+            "speedup": 8.326489169465821
+          }
+        ]
+      }
+    }
+  ],
+  "hardware": {
+    "device_name": "NVIDIA Thor",
+    "sm_count": 20,
+    "total_memory_gb": 131.88175872
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "timestamp": "2025-12-21T06:18:46.810510",
+  "results": [
+    {
+      "framework": "native",
+      "n_samples": 1000,
+      "epochs": 10,
+      "batch_size": 64,
+      "elapsed_sec": 0.10464159900584491,
+      "samples_per_sec": 95564.28891574407,
+      "batches_per_sec": 1529.0286226519052
+    },
+    {
+      "framework": "pytorch",
+      "n_samples": 1000,
+      "epochs": 10,
+      "batch_size": 64,
+      "elapsed_sec": 9.099295722000534,
+      "samples_per_sec": 1098.9861529416742,
+      "batches_per_sec": 17.583778447066788
+    },
+    {
+      "framework": "native",
+      "n_samples": 10000,
+      "epochs": 10,
+      "batch_size": 256,
+      "elapsed_sec": 0.3201760049996665,
+      "samples_per_sec": 312328.214602166,
+      "batches_per_sec": 1249.312858408664
+    },
+    {
+      "framework": "pytorch",
+      "n_samples": 10000,
+      "epochs": 10,
+      "batch_size": 256,
+      "elapsed_sec": 22.796337214000232,
+      "samples_per_sec": 4386.6696242142625,
+      "batches_per_sec": 17.546678496857048
+    },
+    {
+      "framework": "native",
+      "n_samples": 10000,
+      "epochs": 50,
+      "batch_size": 256,
+      "elapsed_sec": 1.3980376710023847,
+      "samples_per_sec": 357644.15392433805,
+      "batches_per_sec": 1430.5766156973523
+    },
+    {
+      "framework": "pytorch",
+      "n_samples": 10000,
+      "epochs": 50,
+      "batch_size": 256,
+      "elapsed_sec": 113.16692982699897,
+      "samples_per_sec": 4418.251875917834,
+      "batches_per_sec": 17.673007503671332
+    }
+  ]
+}

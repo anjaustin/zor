@@ -1,0 +1,648 @@
+# TriX Architecture Guide
+
+This document provides a comprehensive overview of the TriX architecture for researchers and developers.
+
+## Table of Contents
+
+1. [Design Philosophy](#design-philosophy)
+2. [Core Components](#core-components)
+3. [Routing Mechanism](#routing-mechanism)
+4. [Hierarchical Organization](#hierarchical-organization)
+5. [Weight Representation](#weight-representation)
+6. [Training Dynamics](#training-dynamics)
+7. [Inference Optimization](#inference-optimization)
+8. [XOR Superposition Compression](#xor-superposition-compression)
+9. [Providence: The Unified Architecture](#providence-the-unified-architecture)
+
+---
+
+## Design Philosophy
+
+### The Central Thesis
+
+Traditional neural networks learn dense transformations where every weight participates in every computation. Mixture-of-Experts (MoE) architectures address this by routing inputs to specialized sub-networks, but they require **learned routing networks** with additional parameters.
+
+TriX proposes a third path: **emergent routing** where the routing decision arises naturally from the structure of the weights themselves.
+
+### Key Principles
+
+1. **Ternary Constraints Enable Structure**
+   - Weights restricted to {-1, 0, +1} develop interpretable signatures
+   - Signatures encode what features each tile "cares about"
+
+2. **Routing Without Routing Networks**
+   - No learned gating mechanism
+   - Content-addressable lookup via signature matching
+   - Zero additional parameters for routing
+
+3. **Sparsity Through Selection**
+   - Only the winning tile computes
+   - Computation proportional to 1/num_tiles
+   - Memory bandwidth reduced via 2-bit packing
+
+---
+
+## Core Components
+
+### TriXLinear
+
+The foundational layer implementing ternary linear transformation:
+
+```python
+class TriXLinear(nn.Module):
+    """
+    Linear layer with ternary weights {-1, 0, +1}.
+    
+    During training: continuous weights quantized via STE
+    During inference: true 2-bit computation
+    """
+    def __init__(self, in_features, out_features):
+        self.weight = nn.Parameter(torch.randn(out_features, in_features))
+        
+    def forward(self, x):
+        # Straight-through estimator: gradient flows through sign()
+        w_ternary = STESign.apply(self.weight)
+        return F.linear(x, w_ternary)
+```
+
+### TriXTile
+
+A single specialist unit:
+
+```python
+class TriXTile(nn.Module):
+    """
+    One specialist in the mixture.
+    
+    Components:
+    - up_proj: d_model → d_hidden (expansion)
+    - down_proj: d_hidden → d_model (compression)
+    - signature: derived from weight structure
+    """
+    def __init__(self, d_model, d_hidden):
+        self.up_proj = TriXLinear(d_model, d_hidden)
+        self.down_proj = TriXLinear(d_hidden, d_model)
+        
+    @property
+    def signature(self):
+        # Tile's "address" in content space
+        return self.up_proj.weight.sum(dim=0).sign()
+```
+
+### HierarchicalTriXFFN
+
+The main feed-forward network with hierarchical routing:
+
+```
+Input (B, T, D)
+      │
+      ▼
+┌─────────────────┐
+│ Cluster Routing │  ← O(√n) signature comparisons
+│  (8 clusters)   │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Tile Routing   │  ← O(√n) within-cluster comparisons  
+│ (8 tiles/cluster)│
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Winning Tile   │  ← Only 1 of 64 tiles executes
+│   Computation   │
+└────────┬────────┘
+         │
+         ▼
+Output (B, T, D)
+```
+
+---
+
+## Routing Mechanism
+
+### Signature Computation
+
+Each tile's signature is computed from its weights:
+
+```python
+def compute_signature(tile):
+    """
+    Aggregate weight preferences into a signature vector.
+    
+    Intuition: If many weights for feature i are +1, 
+    the tile "wants" high values of feature i.
+    """
+    # Sum across output dimension
+    raw_sig = tile.up_proj.weight.sum(dim=0)  # (d_model,)
+    
+    # Ternarize to get clean signature
+    signature = raw_sig.sign()  # ∈ {-1, 0, +1}^d_model
+    
+    return signature
+```
+
+### Content-Addressable Lookup
+
+Routing is a simple dot product:
+
+```python
+def route(input, signatures):
+    """
+    Route input to best-matching tile.
+    
+    High score = input aligns with tile's preferences
+    """
+    # Compute alignment scores
+    scores = input @ signatures.T  # (batch, seq, num_tiles)
+    
+    # Winner-take-all
+    winner_idx = scores.argmax(dim=-1)
+    
+    return winner_idx
+```
+
+### Why This Works
+
+Consider a tile with signature `[+1, +1, -1, 0, ...]`:
+- Scores high when input has: high feature 0, high feature 1, low feature 2
+- Scores low for inputs with opposite pattern
+- Ignores features where signature is 0
+
+This creates **natural specialization**: tiles become experts for input subspaces that align with their signatures.
+
+---
+
+## Hierarchical Organization
+
+### The Scaling Problem
+
+With n tiles, naive routing requires O(n) comparisons per token. For n=1000 tiles, this becomes expensive.
+
+### Two-Level Hierarchy
+
+TriX organizes tiles into clusters:
+
+```
+64 tiles = 8 clusters × 8 tiles/cluster
+
+Routing cost: O(8) + O(8) = O(16) vs O(64)
+General: O(√n) + O(√n) = O(√n) vs O(n)
+```
+
+### Cluster Signatures
+
+Each cluster has a representative signature:
+
+```python
+def compute_cluster_signature(cluster_tiles):
+    """Average signature of tiles in cluster."""
+    tile_sigs = [tile.signature for tile in cluster_tiles]
+    return torch.stack(tile_sigs).mean(dim=0).sign()
+```
+
+### Routing Process
+
+```python
+def hierarchical_route(input, clusters):
+    # Level 1: Find best cluster
+    cluster_sigs = [c.signature for c in clusters]
+    cluster_scores = input @ torch.stack(cluster_sigs).T
+    best_cluster = cluster_scores.argmax(dim=-1)
+    
+    # Level 2: Find best tile within cluster
+    cluster = clusters[best_cluster]
+    tile_sigs = [t.signature for t in cluster.tiles]
+    tile_scores = input @ torch.stack(tile_sigs).T
+    best_tile = tile_scores.argmax(dim=-1)
+    
+    return best_cluster, best_tile
+```
+
+---
+
+## Weight Representation
+
+### Ternary Encoding
+
+Weights are stored as 2-bit values:
+
+| Value | Encoding |
+|-------|----------|
+| -1    | 00       |
+|  0    | 01       |
+| +1    | 10       |
+| (unused) | 11    |
+
+### Packing
+
+Four weights pack into one byte:
+
+```python
+def pack_weights(weights):
+    """Pack ternary weights to 2-bit representation."""
+    # Map {-1, 0, +1} to {0, 1, 2}
+    encoded = (weights + 1).to(torch.uint8)
+    
+    # Pack 4 values per byte
+    packed = (encoded[0::4] << 6) | (encoded[1::4] << 4) | \
+             (encoded[2::4] << 2) | encoded[3::4]
+    
+    return packed
+```
+
+### Memory Savings
+
+| Representation | Bits/Weight | Compression |
+|----------------|-------------|-------------|
+| FP32           | 32          | 1×          |
+| FP16           | 16          | 2×          |
+| INT8           | 8           | 4×          |
+| **TriX (2-bit)** | **2**     | **16×**     |
+
+---
+
+## Training Dynamics
+
+### Straight-Through Estimator (STE)
+
+The sign() function has zero gradient almost everywhere. STE provides a surrogate gradient:
+
+```python
+class STESign(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, input):
+        return input.sign()
+    
+    @staticmethod
+    def backward(ctx, grad_output):
+        # Pass gradient through as if sign() were identity
+        return grad_output
+```
+
+### Auxiliary Losses
+
+Balanced routing requires regularization:
+
+```python
+def compute_aux_losses(routing_probs):
+    # Load balancing: encourage uniform tile usage
+    load = routing_probs.mean(dim=[0, 1])  # (num_tiles,)
+    target = 1.0 / num_tiles
+    load_loss = ((load - target) ** 2).sum()
+    
+    # Entropy: encourage confident routing
+    entropy = -(routing_probs * routing_probs.log()).sum(dim=-1).mean()
+    entropy_loss = entropy  # Minimize entropy = maximize confidence
+    
+    return load_loss + 0.01 * entropy_loss
+```
+
+### Signature Evolution
+
+During training, signatures evolve to cover the input space:
+
+```
+Epoch 0:   Random signatures, random routing
+Epoch 10:  Signatures begin differentiating  
+Epoch 50:  Clear specialization emerges
+Epoch 100: Stable, diverse signatures
+```
+
+---
+
+## Inference Optimization
+
+### Compiled Dispatch
+
+For known input classes, routes can be precomputed:
+
+```python
+class CompiledDispatch:
+    """O(1) routing via lookup table."""
+    
+    def compile(self, class_id, representative_input):
+        # Compute route once
+        route = self.router(representative_input)
+        self.lookup_table[class_id] = route
+    
+    def forward(self, x, class_id):
+        if class_id in self.lookup_table:
+            # O(1) lookup
+            tile_idx = self.lookup_table[class_id]
+            return self.tiles[tile_idx](x)
+        else:
+            # Fallback to dynamic routing
+            return self.dynamic_route(x)
+```
+
+### NEON Kernel
+
+For ARM platforms, a NEON-accelerated kernel provides:
+- Vectorized 2-bit unpacking
+- Ternary multiply-accumulate
+- ~4× speedup on Jetson platforms
+
+```cpp
+// Ternary MAC: accumulate += input * weight
+// where weight ∈ {-1, 0, +1}
+int8x16_t trix_mac(int8x16_t acc, int8x16_t input, uint8x16_t packed_weights) {
+    // Unpack 2-bit weights to int8
+    int8x16_t weights = unpack_ternary(packed_weights);
+    
+    // Ternary multiply: -input, 0, or +input
+    int8x16_t product = vmulq_s8(input, weights);
+    
+    return vaddq_s8(acc, product);
+}
+```
+
+---
+
+## XOR Superposition Compression
+
+### The Compression Opportunity
+
+Trained tile signatures exhibit ~99% structural similarity. Instead of storing N independent signatures, we can store:
+
+```
+Base signature (centroid) + N sparse XOR deltas
+```
+
+### Mathematical Foundation
+
+For ternary vectors, a key equivalence holds:
+
+```
+dot(a, b) = d_model - 2 × hamming(a, b)
+```
+
+Therefore: **argmax(dot) = argmin(hamming)**
+
+This means Hamming distance routing produces identical results to dot product routing.
+
+### Compression Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│               CompressedSignatures                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  base_packed: uint8[(d+3)//4]   ← Centroid (majority vote)  │
+│                                                              │
+│  deltas[0]: SparseDelta         ← Only differences stored   │
+│    ├── positions: [5, 42, 107]  ← Where it differs         │
+│    └── values: [+1, -1, +1]     ← What the values are      │
+│                                                              │
+│  deltas[1]: SparseDelta                                     │
+│    ├── positions: [3, 99]                                   │
+│    └── values: [-1, +1]                                     │
+│  ...                                                         │
+│                                                              │
+│  Memory: base + Σ(3 bytes × num_differences)                │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Compression Ratios
+
+| Configuration | Original | Compressed | Ratio |
+|---------------|----------|------------|-------|
+| 64×512, 99% similar | 128 KB | 1 KB | **129×** |
+| 256×1024, 99% similar | 1 MB | 8 KB | **128×** |
+| 64×512, random | 128 KB | 48 KB | 2.7× |
+
+### Compressed Routing
+
+```python
+# Training: dot product routing
+scores = input @ signatures.T
+winner = scores.argmax(dim=-1)
+
+# Inference: Hamming distance routing
+distances = hamming(input, signatures)
+winner = distances.argmin(dim=-1)  # Same result!
+```
+
+### Determinism
+
+Compressed routing is **bit-exact reproducible**:
+
+```python
+ffn.compress_signatures()
+ffn.eval()
+
+_, r1, _ = ffn(x)
+_, r2, _ = ffn(x)
+_, r3, _ = ffn(x)
+
+assert torch.equal(r1['tile_idx'], r2['tile_idx'])  # Always
+assert torch.equal(r2['tile_idx'], r3['tile_idx'])  # Always
+```
+
+This is the foundation for **auditable, verifiable neural computation**.
+
+---
+
+## Component Reference
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `TriXLinear` | `kernel/bindings.py` | Base ternary linear |
+| `TriXTile` | `nn/hierarchical.py` | Single specialist |
+| `HierarchicalTriXFFN` | `nn/hierarchical.py` | Main FFN |
+| `SparseLookupFFN` | `nn/sparse_lookup.py` | Routing-as-computation |
+| `TemporalTileLayer` | `nn/temporal_tiles.py` | State-aware routing |
+| `CompiledDispatch` | `nn/compiled_dispatch.py` | O(1) inference |
+| `CompressedSignatures` | `nn/xor_superposition.py` | 129× signature compression |
+| `SuperpositionRouter` | `nn/xor_superposition.py` | Hamming-distance routing |
+| `XORSuperpositionFFN` | `nn/xor_superposition.py` | Drop-in compressed FFN |
+
+---
+
+## Providence: The Unified Architecture
+
+All the components above—routing, tiles, hierarchical organization, temporal state—converge into a single unified architecture: **Providence**.
+
+### The Insight
+
+```
+TILE = signature + shape + state
+     = address   + transform + memory
+     = key       + computation + value
+
+Attention(Q, K, V) = softmax(QK^T) V
+Providence(query, sigs, shapes) = shapes[argmin(hamming(query, sigs))](query)
+```
+
+**Attention is soft Providence. Providence is hard attention.**
+
+### Four Synthesized Components
+
+| Component | What it Provides |
+|-----------|------------------|
+| **XOR Routing** | Hamming distance matching (O(1) per comparison) |
+| **Frozen Shapes** | 0 learnable compute params (pure geometry) |
+| **Hierarchical Routing** | O(√n) cluster→tile scaling |
+| **Temporal State** | Per-tile memory that persists across time |
+
+### The ProvidenceFFN
+
+```python
+from trix.nn import create_providence_ffn
+
+# Unified architecture with all components
+ffn = create_providence_ffn(
+    d_model=128,
+    num_tiles=64,
+    d_state=16,           # Temporal state
+    use_frozen_shapes=True,  # 0 compute params
+    mode='hierarchical',     # O(√n) routing
+)
+
+state = ffn.init_state(batch_size=8)
+output, state, routing_info, aux = ffn(x, state)
+```
+
+### Why Providence Matters
+
+1. **Content-Addressable**: Inputs find their computation via XOR matching
+2. **Geometrically Pure**: Optional frozen shapes have 0 learnable parameters
+3. **Temporally Aware**: State persists, enabling sequence understanding
+4. **Scalable**: O(√n) hierarchical routing
+5. **Unified**: All previous FFN variants are projections of this one structure
+
+See [Providence](PROVIDENCE.md) for complete documentation.
+
+---
+
+## The Forge: Deterministic Computation
+
+While Providence handles neural routing, the **Forge** handles deterministic computation. These are two views of the same underlying architecture.
+
+### The Connection
+
+```
+Providence (Neural)              Forge (Deterministic)
+─────────────────────────────────────────────────────
+Soft routing (gradients)         Hard routing (lookup)
+Trainable shapes                 Frozen shapes
+Approximate output               Exact output (100/100)
+Learning phase                   Execution phase
+```
+
+**They are fungible.** Train with Providence, execute with Forge.
+
+### Forge Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                           FORGE                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Foundry (Compiler)                                             │
+│  ├── atom(name, truth_fn)      ← Define from truth table        │
+│  ├── compose(name, comp)       ← Combine with algebra           │
+│  └── build() → System          ← Compile to executable          │
+│                                                                  │
+│  System (Executable)                                            │
+│  ├── execute(a, b, op)         ← Direct computation             │
+│  ├── validate(exhaustive)      ← 100% proof                     │
+│  ├── export_cuda(path)         ← GPU kernels                    │
+│  └── export_verilog(path)      ← FPGA/ASIC RTL                  │
+│                                                                  │
+│  ShapeTerms (IR)                                                │
+│  └── Polynomial representation: XOR = a + b - 2ab              │
+│                                                                  │
+│  Composition Operators                                          │
+│  ├── seq(a, b)                 ← Sequential: b(a(x))            │
+│  ├── par(a, b)                 ← Parallel: (a(x), b(x))         │
+│  ├── sel(*shapes)              ← Selection: opcode picks        │
+│  └── rep(shape, n)             ← Repetition: chain n times      │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Usage
+
+```python
+from trix.forge import Foundry
+
+# Define
+foundry = Foundry(bits=8)
+foundry.atom("xor", lambda a, b: a ^ b)
+foundry.atom("and", lambda a, b: a & b)
+
+# Build
+system = foundry.build()
+
+# Validate (100/100 required)
+assert system.validate(exhaustive=True).all_passed()
+
+# Execute
+result = system.execute(42, 13, "xor")  # 39
+
+# Export
+system.export_cuda("output/cuda/")
+system.export_verilog("output/verilog/")
+```
+
+### Performance (NVIDIA Thor)
+
+| Benchmark | Throughput |
+|-----------|------------|
+| LFSR (random bits) | 35.58 Tbits/sec |
+| Sustained XOR | 1.12 trillion ops/sec |
+| ChaCha cipher | 1.03 GB/sec |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `forge/foundry.py` | Foundry compiler class |
+| `forge/system.py` | Executable system |
+| `forge/composition.py` | seq, par, sel, rep |
+| `forge/signature.py` | Term-based signatures |
+| `forge/term.py` | ShapeTerms IR |
+| `forge/cuda.py` | CUDA generation |
+| `forge/verilog.py` | Verilog generation |
+
+See [THE_WAY.md](THE_WAY.md) for the philosophical underpinning.
+See [XORPU_COMPLETE.md](XORPU_COMPLETE.md) for detailed XORPU documentation.
+
+---
+
+## The Unified View
+
+```
+                        THE WAY
+                           │
+         ┌─────────────────┼─────────────────┐
+         │                 │                 │
+    PROVIDENCE          FOUNDRY           FABRIC
+    (Neural)          (Compiler)         (Hardware)
+         │                 │                 │
+   Ternary routing    ShapeTerms IR       CUDA/Verilog
+   Tile signatures    Composition         Frozen kernels
+   Soft gradients     Hard validation     Silicon speed
+         │                 │                 │
+         └─────────────────┴─────────────────┘
+                           │
+                    SHAPE = COMPUTE
+```
+
+Train with gradients (Providence). Compile with algebra (Foundry). Execute with geometry (Fabric).
+
+**This is The Way.**
+
+---
+
+## Further Reading
+
+- [THE_WAY.md](THE_WAY.md) - The unified philosophy
+- [Providence](PROVIDENCE.md) - The unified neural architecture
+- [XORPU_COMPLETE.md](XORPU_COMPLETE.md) - Deterministic computation details
+- [Theory](THEORY.md) - Mathematical foundations
+- [API Reference](API.md) - Complete API documentation
+- [Benchmarks](BENCHMARKS.md) - Performance methodology

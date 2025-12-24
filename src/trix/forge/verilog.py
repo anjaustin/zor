@@ -1,0 +1,367 @@
+"""
+Verilog RTL generation for XORPU shapes.
+
+Generates synthesizable Verilog from ShapeTerms specifications.
+
+Usage:
+    from trix.forge.verilog import shape_to_verilog, export_verilog
+
+    # Generate single shape
+    xor_shape = generate_xor_shape(bits=32)
+    verilog = shape_to_verilog(xor_shape)
+
+    # Export all shapes
+    shapes = generate_all_shapes(bits=32)
+    export_verilog(shapes, "rtl/")
+"""
+
+from typing import Dict, List, Optional
+from pathlib import Path
+from datetime import datetime
+
+from .term import ShapeTerms, Term, BitTerms, generate_all_shapes
+
+
+# =============================================================================
+# VERILOG GENERATION
+# =============================================================================
+
+def _term_to_verilog(term: Term, bits: int) -> str:
+    """
+    Convert a term to Verilog expression.
+
+    For a[i], b[i] indexing where:
+    - indices 0 to bits-1 are a[0] to a[bits-1]
+    - indices bits to 2*bits-1 are b[0] to b[bits-1]
+    """
+    if term.is_constant():
+        return f"{term.coefficient}'b1" if term.coefficient == 1 else f"{term.coefficient}"
+
+    # Map variable indices to a/b notation
+    var_strs = []
+    for v in term.variables:
+        if v < bits:
+            var_strs.append(f"a[{v}]")
+        else:
+            var_strs.append(f"b[{v - bits}]")
+
+    if len(var_strs) == 1:
+        return var_strs[0]
+    else:
+        # AND of multiple variables
+        return " & ".join(var_strs)
+
+
+def _is_simple_shape(shape: ShapeTerms) -> Optional[str]:
+    """
+    Check if shape is a simple recognizable pattern.
+
+    Returns gate name if recognized, None otherwise.
+    """
+    name = shape.name.lower()
+    if name in ["xor", "and", "or", "not", "nand", "nor", "xnor", "nop"]:
+        return name
+    return None
+
+
+def _generate_simple_bit(shape_type: str, bit: int) -> str:
+    """Generate optimized Verilog for simple shapes."""
+    if shape_type == "xor":
+        return f"a[{bit}] ^ b[{bit}]"
+    elif shape_type == "and":
+        return f"a[{bit}] & b[{bit}]"
+    elif shape_type == "or":
+        return f"a[{bit}] | b[{bit}]"
+    elif shape_type == "not":
+        return f"~a[{bit}]"
+    elif shape_type == "nand":
+        return f"~(a[{bit}] & b[{bit}])"
+    elif shape_type == "nor":
+        return f"~(a[{bit}] | b[{bit}])"
+    elif shape_type == "xnor":
+        return f"~(a[{bit}] ^ b[{bit}])"
+    elif shape_type == "nop":
+        return f"a[{bit}]"
+    else:
+        return None
+
+
+def _generate_polynomial_bit(bit_terms: BitTerms, bits: int) -> List[str]:
+    """
+    Generate Verilog for a general polynomial bit.
+
+    Returns list of Verilog statements.
+    """
+    statements = []
+    bit_idx = bit_terms.bit_index
+
+    # Generate wire for each term
+    term_wires = []
+    for i, term in enumerate(bit_terms.terms):
+        wire_name = f"t{bit_idx}_{i}"
+
+        if term.is_constant():
+            # Constant term
+            val = term.coefficient & 1  # Only care about LSB for XOR
+            statements.append(f"    wire {wire_name} = 1'b{val};")
+        else:
+            expr = _term_to_verilog(term, bits)
+            # Handle coefficients
+            if term.coefficient == 1:
+                statements.append(f"    wire {wire_name} = {expr};")
+            elif term.coefficient == -1:
+                # For XOR sum, -1 is same as +1 (negation in GF(2))
+                statements.append(f"    wire {wire_name} = {expr};")
+            elif term.coefficient == 2 or term.coefficient == -2:
+                # +2 or -2 means XOR twice (cancels in GF(2))
+                # So we don't include it at all in the XOR reduction
+                # But for polynomial correctness, we need to handle this
+                # In GF(2): 2x = 0, so these terms vanish
+                statements.append(f"    // {wire_name}: coefficient {term.coefficient} (vanishes in GF(2))")
+                continue
+            else:
+                statements.append(f"    wire {wire_name} = {expr}; // coeff={term.coefficient}")
+
+        term_wires.append(wire_name)
+
+    # XOR reduction for final result
+    if term_wires:
+        xor_expr = " ^ ".join(term_wires)
+        statements.append(f"    assign result[{bit_idx}] = {xor_expr};")
+    else:
+        statements.append(f"    assign result[{bit_idx}] = 1'b0;")
+
+    return statements
+
+
+def shape_to_verilog(
+    shape: ShapeTerms,
+    optimize: bool = True,
+    include_header: bool = True,
+) -> str:
+    """
+    Generate Verilog module for a shape.
+
+    Args:
+        shape: The shape specification
+        optimize: If True, recognize simple patterns (XOR, AND, etc.)
+        include_header: If True, include generation timestamp and metadata
+
+    Returns:
+        Verilog module as string
+    """
+    lines = []
+
+    # Header comment
+    if include_header:
+        lines.append(f"// Auto-generated by trix.forge")
+        lines.append(f"// Generated: {datetime.now().isoformat()}")
+        lines.append(f"// Shape: {shape.name} ({shape.output_bits}-bit)")
+        lines.append(f"// Total terms: {shape.total_terms()}")
+        lines.append("")
+
+    # Module declaration
+    module_name = f"xorpu_{shape.name}"
+    lines.append(f"module {module_name} (")
+
+    # Ports depend on whether it's single or dual operand
+    if shape.input_bits == shape.output_bits:
+        # Single operand (like NOT)
+        lines.append(f"    input  wire [{shape.output_bits-1}:0] a,")
+        lines.append(f"    output wire [{shape.output_bits-1}:0] result")
+    else:
+        # Dual operand
+        lines.append(f"    input  wire [{shape.output_bits-1}:0] a,")
+        lines.append(f"    input  wire [{shape.output_bits-1}:0] b,")
+        lines.append(f"    output wire [{shape.output_bits-1}:0] result")
+
+    lines.append(");")
+    lines.append("")
+
+    # Check for simple patterns
+    simple_type = _is_simple_shape(shape) if optimize else None
+
+    if simple_type:
+        # Generate optimized simple logic
+        for i in range(shape.output_bits):
+            expr = _generate_simple_bit(simple_type, i)
+            lines.append(f"    assign result[{i}] = {expr};")
+    else:
+        # Generate full polynomial
+        for bit_terms in shape.bit_terms:
+            statements = _generate_polynomial_bit(bit_terms, shape.output_bits)
+            lines.extend(statements)
+            lines.append("")
+
+    lines.append("")
+    lines.append("endmodule")
+
+    return "\n".join(lines)
+
+
+def export_verilog(
+    shapes: Dict[str, ShapeTerms],
+    output_dir: str,
+    optimize: bool = True,
+) -> List[str]:
+    """
+    Export multiple shapes to Verilog files.
+
+    Args:
+        shapes: Dictionary of shape name -> ShapeTerms
+        output_dir: Directory to write files
+        optimize: If True, recognize simple patterns
+
+    Returns:
+        List of generated file paths
+    """
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    generated_files = []
+
+    for name, shape in shapes.items():
+        verilog = shape_to_verilog(shape, optimize=optimize)
+        file_path = output_path / f"xorpu_{name}.v"
+
+        with open(file_path, 'w') as f:
+            f.write(verilog)
+
+        generated_files.append(str(file_path))
+
+    # Generate top-level wrapper
+    wrapper = _generate_wrapper(shapes)
+    wrapper_path = output_path / "xorpu_top.v"
+    with open(wrapper_path, 'w') as f:
+        f.write(wrapper)
+    generated_files.append(str(wrapper_path))
+
+    return generated_files
+
+
+def _generate_wrapper(shapes: Dict[str, ShapeTerms]) -> str:
+    """Generate top-level XORPU wrapper module."""
+    lines = []
+
+    lines.append("// Auto-generated XORPU top-level wrapper")
+    lines.append(f"// Generated: {datetime.now().isoformat()}")
+    lines.append(f"// Shapes: {len(shapes)}")
+    lines.append("")
+
+    # Find common bit width
+    bits = 32
+    for shape in shapes.values():
+        bits = shape.output_bits
+        break
+
+    # Shape ID mapping
+    lines.append("// Shape IDs:")
+    for i, name in enumerate(sorted(shapes.keys())):
+        lines.append(f"//   {i}: {name}")
+    lines.append("")
+
+    # Module declaration
+    lines.append("module xorpu_top (")
+    lines.append(f"    input  wire [{bits-1}:0] a,")
+    lines.append(f"    input  wire [{bits-1}:0] b,")
+    lines.append(f"    input  wire [3:0] shape_id,")
+    lines.append(f"    output reg  [{bits-1}:0] result")
+    lines.append(");")
+    lines.append("")
+
+    # Instantiate all shapes
+    for i, name in enumerate(sorted(shapes.keys())):
+        lines.append(f"    wire [{bits-1}:0] result_{name};")
+        if shapes[name].input_bits == bits:
+            lines.append(f"    xorpu_{name} u_{name} (.a(a), .result(result_{name}));")
+        else:
+            lines.append(f"    xorpu_{name} u_{name} (.a(a), .b(b), .result(result_{name}));")
+
+    lines.append("")
+
+    # MUX for shape selection
+    lines.append("    always @(*) begin")
+    lines.append("        case (shape_id)")
+    for i, name in enumerate(sorted(shapes.keys())):
+        lines.append(f"            4'd{i}: result = result_{name};")
+    lines.append(f"            default: result = {bits}'b0;")
+    lines.append("        endcase")
+    lines.append("    end")
+    lines.append("")
+
+    lines.append("endmodule")
+
+    return "\n".join(lines)
+
+
+def generate_testbench(shape: ShapeTerms, test_cases: List[tuple] = None) -> str:
+    """
+    Generate Verilog testbench for a shape.
+
+    Args:
+        shape: The shape specification
+        test_cases: Optional list of (a, b, expected) tuples
+
+    Returns:
+        Verilog testbench as string
+    """
+    lines = []
+    bits = shape.output_bits
+    module_name = f"xorpu_{shape.name}"
+
+    lines.append(f"// Testbench for {module_name}")
+    lines.append(f"// Generated: {datetime.now().isoformat()}")
+    lines.append("")
+
+    lines.append(f"module tb_{shape.name};")
+    lines.append(f"    reg [{bits-1}:0] a;")
+    if shape.input_bits > bits:
+        lines.append(f"    reg [{bits-1}:0] b;")
+    lines.append(f"    wire [{bits-1}:0] result;")
+    lines.append("")
+
+    # Instantiate DUT
+    if shape.input_bits == bits:
+        lines.append(f"    {module_name} dut (.a(a), .result(result));")
+    else:
+        lines.append(f"    {module_name} dut (.a(a), .b(b), .result(result));")
+    lines.append("")
+
+    # Test stimulus
+    lines.append("    initial begin")
+    lines.append(f'        $display("Testing {module_name}");')
+
+    if test_cases:
+        for a_val, b_val, expected in test_cases:
+            lines.append(f"        a = {bits}'h{a_val:X};")
+            if shape.input_bits > bits:
+                lines.append(f"        b = {bits}'h{b_val:X};")
+            lines.append("        #10;")
+            lines.append(f'        if (result !== {bits}\'h{expected:X}) $display("FAIL: a=%h b=%h got=%h expected=%h", a, b, result, {bits}\'h{expected:X});')
+    else:
+        # Default test: zeros
+        lines.append(f"        a = {bits}'h0;")
+        if shape.input_bits > bits:
+            lines.append(f"        b = {bits}'h0;")
+        lines.append("        #10;")
+        lines.append('        $display("a=%h b=%h result=%h", a, b, result);')
+
+    lines.append('        $display("Test complete");')
+    lines.append("        $finish;")
+    lines.append("    end")
+    lines.append("")
+
+    lines.append("endmodule")
+
+    return "\n".join(lines)
+
+
+# =============================================================================
+# EXPORTS
+# =============================================================================
+
+__all__ = [
+    "shape_to_verilog",
+    "export_verilog",
+    "generate_testbench",
+]

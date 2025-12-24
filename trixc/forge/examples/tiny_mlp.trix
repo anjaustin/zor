@@ -1,0 +1,77 @@
+# TRIX Model: Tiny MLP Classifier
+# The "Hello World" of TRIX Forge
+#
+# Architecture: 4 → 8 → 2 (input → hidden → output)
+# Task: Binary classification
+# Size: ~1.8 KB when compiled
+
+version: "1.0"
+name: tiny_mlp
+description: "A minimal multi-layer perceptron for binary classification"
+
+# Input specification
+input:
+  shape: [4]
+  dtype: float32
+
+# Output specification
+output:
+  shape: [2]
+  dtype: float32
+  activation: softmax
+
+# Layer definitions
+shapes:
+  - name: linear_1
+    type: linear
+    input: [4]
+    output: [8]
+    init: xavier
+
+  - name: activation_1
+    type: relu
+
+  - name: linear_2
+    type: linear
+    input: [8]
+    output: [2]
+    init: xavier
+
+  - name: output_activation
+    type: softmax
+
+# Tunable parameters
+levers:
+  precision:
+    type: enum
+    options: [fp32, fp16, fp8]
+    default: fp16
+    description: "Numeric precision for weights and activations"
+
+  optimize:
+    type: enum
+    options: [none, basic, aggressive]
+    default: aggressive
+    description: "Optimization level - aggressive enables fusion"
+
+  fuse_ops:
+    type: bool
+    default: true
+    description: "Fuse Linear+ReLU into single operation"
+
+  debug_info:
+    type: bool
+    default: false
+    description: "Include debug symbols in compiled output"
+
+  glassbox:
+    type: bool
+    default: true
+    description: "Enable Glassbox event emission during inference"
+
+# Metadata
+metadata:
+  author: "TRIX Forge"
+  license: "MIT"
+  created: "2025-12-22"
+  tags: ["classifier", "mlp", "example"]

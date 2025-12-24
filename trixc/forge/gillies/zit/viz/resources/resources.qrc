@@ -1,0 +1,7 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/">
+        <!-- Shaders will be embedded here if needed -->
+        <!-- Currently using inline shaders for simplicity -->
+    </qresource>
+</RCC>

@@ -1,0 +1,58 @@
+# Fabric: 4-element sorting network
+# Uses MIN/MAX frozen shapes to sort 4 inputs
+#
+# Bitonic sorting network for 4 elements:
+#   Layer 0: Compare pairs (0,1) and (2,3)
+#   Layer 1: Compare pairs (0,2) and (1,3), then (1,2)
+#
+# Since we only have 2 layers, this is a partial sort
+# that demonstrates the concept.
+
+fabric:
+  name: sorter_4
+  inputs: 4
+  outputs: 4
+
+  layers:
+    # Layer 0: Compare-exchange pairs
+    - nodes:
+        - shape: MIN
+          a: in.0
+          b: in.1
+        - shape: MAX
+          a: in.0
+          b: in.1
+        - shape: MIN
+          a: in.2
+          b: in.3
+        - shape: MAX
+          a: in.2
+          b: in.3
+        # Remaining ALUs unused
+        - shape: NOP
+        - shape: NOP
+        - shape: NOP
+        - shape: NOP
+
+    # Layer 1: Merge step
+    - nodes:
+        - shape: MIN
+          a: L0.0
+          b: L0.2
+        - shape: MIN
+          a: L0.1
+          b: L0.3
+        - shape: MAX
+          a: L0.0
+          b: L0.2
+        - shape: MAX
+          a: L0.1
+          b: L0.3
+        # Remaining ALUs unused
+        - shape: NOP
+        - shape: NOP
+        - shape: NOP
+        - shape: NOP
+
+# Outputs: [min_all, second, third, max_all]
+# Note: This is a partial bitonic sort - full sort needs 3 layers

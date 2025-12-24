@@ -1,0 +1,96 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trix-forge"
+version = "1.0.0"
+description = "Neural Compilation Framework - Watch neural networks think"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+authors = [
+    {name = "Tripp Josserand-Austin", email = "tripp@anjaustin.com"},
+]
+keywords = [
+    "neural-networks",
+    "compiler",
+    "machine-learning",
+    "edge-computing",
+    "embedded",
+    "visualization",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Compilers",
+]
+
+dependencies = []
+
+[project.optional-dependencies]
+cli = [
+    "rich>=13.0",
+    "textual>=0.40",
+    "click>=8.0",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "ruff>=0.1.0",
+]
+all = [
+    "trix-forge[cli,dev]",
+]
+
+[project.scripts]
+forge = "trix_forge.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/trix-forge/trix-forge"
+Documentation = "https://trix-forge.readthedocs.io"
+Repository = "https://github.com/trix-forge/trix-forge"
+Issues = "https://github.com/trix-forge/trix-forge/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+trix_forge = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+
+[tool.black]
+line-length = 100
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
+ignore = ["E501"]  # Line length handled by black
+
+[tool.coverage.run]
+source = ["src/trix_forge"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]

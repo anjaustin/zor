@@ -1,0 +1,618 @@
+{
+  "metadata": {
+    "timestamp": "2025-12-21T06:05:19.909751",
+    "runs_per_benchmark": 10
+  },
+  "hardware": {
+    "gpu": {
+      "name": "NVIDIA Thor",
+      "compute_capability": "11.0",
+      "sm_count": 20,
+      "total_memory_gb": 131.88,
+      "max_threads_per_block": 1024
+    },
+    "cuda": {
+      "version": 13000,
+      "driver_version": 13000
+    },
+    "cupy_version": "13.3.0",
+    "torch_version": "2.8.0a0+34c6371d24.nv25.08",
+    "numpy_version": "1.26.4"
+  },
+  "software": {
+    "python": "3.12.3 (main, Nov  6 2025, 13:44:16) [GCC 13.3.0]",
+    "platform": "linux"
+  },
+  "benchmarks": {
+    "emergence_vectorized": [
+      {
+        "name": "emergence_vectorized",
+        "batch_size": 1000,
+        "runs": 10,
+        "times_ms": {
+          "min": 0.852,
+          "max": 0.8659,
+          "mean": 0.8592,
+          "std": 0.0045,
+          "median": 0.8589
+        },
+        "throughput": {
+          "tokens_per_sec": 1173669.0,
+          "millions_per_sec": 1.1737
+        }
+      },
+      {
+        "name": "emergence_vectorized",
+        "batch_size": 5000,
+        "runs": 10,
+        "times_ms": {
+          "min": 0.6496,
+          "max": 0.658,
+          "mean": 0.6523,
+          "std": 0.0023,
+          "median": 0.652
+        },
+        "throughput": {
+          "tokens_per_sec": 7697115.0,
+          "millions_per_sec": 7.6971
+        }
+      },
+      {
+        "name": "emergence_vectorized",
+        "batch_size": 10000,
+        "runs": 10,
+        "times_ms": {
+          "min": 1.2571,
+          "max": 1.6118,
+          "mean": 1.3141,
+          "std": 0.1091,
+          "median": 1.2679
+        },
+        "throughput": {
+          "tokens_per_sec": 7954570.0,
+          "millions_per_sec": 7.9546
+        }
+      },
+      {
+        "name": "emergence_vectorized",
+        "batch_size": 50000,
+        "runs": 10,
+        "times_ms": {
+          "min": 6.7408,
+          "max": 7.8098,
+          "mean": 7.2409,
+          "std": 0.3365,
+          "median": 7.2583
+        },
+        "throughput": {
+          "tokens_per_sec": 7417548.0,
+          "millions_per_sec": 7.4175
+        }
+      },
+      {
+        "name": "emergence_vectorized",
+        "batch_size": 100000,
+        "runs": 10,
+        "times_ms": {
+          "min": 13.0457,
+          "max": 13.7245,
+          "mean": 13.5853,
+          "std": 0.2002,
+          "median": 13.6638
+        },
+        "throughput": {
+          "tokens_per_sec": 7665367.0,
+          "millions_per_sec": 7.6654
+        }
+      },
+      {
+        "name": "emergence_vectorized",
+        "batch_size": 500000,
+        "runs": 10,
+        "times_ms": {
+          "min": 64.7125,
+          "max": 66.2972,
+          "mean": 65.4552,
+          "std": 0.5755,
+          "median": 65.1526
+        },
+        "throughput": {
+          "tokens_per_sec": 7726479.0,
+          "millions_per_sec": 7.7265
+        }
+      },
+      {
+        "name": "emergence_vectorized",
+        "batch_size": 1000000,
+        "runs": 10,
+        "times_ms": {
+          "min": 131.263,
+          "max": 131.8808,
+          "mean": 131.6146,
+          "std": 0.1956,
+          "median": 131.6552
+        },
+        "throughput": {
+          "tokens_per_sec": 7618293.0,
+          "millions_per_sec": 7.6183
+        }
+      }
+    ],
+    "emergence_standard": [
+      {
+        "name": "emergence_standard",
+        "batch_size": 1000,
+        "runs": 10,
+        "times_ms": {
+          "min": 0.364,
+          "max": 0.438,
+          "mean": 0.3964,
+          "std": 0.0231,
+          "median": 0.3909
+        },
+        "throughput": {
+          "tokens_per_sec": 2747328.0,
+          "millions_per_sec": 2.7473
+        }
+      },
+      {
+        "name": "emergence_standard",
+        "batch_size": 5000,
+        "runs": 10,
+        "times_ms": {
+          "min": 0.7302,
+          "max": 0.7664,
+          "mean": 0.7439,
+          "std": 0.0119,
+          "median": 0.7378
+        },
+        "throughput": {
+          "tokens_per_sec": 6847748.0,
+          "millions_per_sec": 6.8477
+        }
+      },
+      {
+        "name": "emergence_standard",
+        "batch_size": 10000,
+        "runs": 10,
+        "times_ms": {
+          "min": 1.3962,
+          "max": 1.5106,
+          "mean": 1.4308,
+          "std": 0.0301,
+          "median": 1.4198
+        },
+        "throughput": {
+          "tokens_per_sec": 7162180.0,
+          "millions_per_sec": 7.1622
+        }
+      },
+      {
+        "name": "emergence_standard",
+        "batch_size": 50000,
+        "runs": 10,
+        "times_ms": {
+          "min": 7.3649,
+          "max": 7.7751,
+          "mean": 7.4531,
+          "std": 0.123,
+          "median": 7.4075
+        },
+        "throughput": {
+          "tokens_per_sec": 6788932.0,
+          "millions_per_sec": 6.7889
+        }
+      },
+      {
+        "name": "emergence_standard",
+        "batch_size": 100000,
+        "runs": 10,
+        "times_ms": {
+          "min": 14.3681,
+          "max": 14.7647,
+          "mean": 14.5362,
+          "std": 0.1274,
+          "median": 14.5305
+        },
+        "throughput": {
+          "tokens_per_sec": 6959849.0,
+          "millions_per_sec": 6.9598
+        }
+      },
+      {
+        "name": "emergence_standard",
+        "batch_size": 500000,
+        "runs": 10,
+        "times_ms": {
+          "min": 69.9831,
+          "max": 70.4093,
+          "mean": 70.2679,
+          "std": 0.1164,
+          "median": 70.2646
+        },
+        "throughput": {
+          "tokens_per_sec": 7144584.0,
+          "millions_per_sec": 7.1446
+        }
+      },
+      {
+        "name": "emergence_standard",
+        "batch_size": 1000000,
+        "runs": 10,
+        "times_ms": {
+          "min": 139.4956,
+          "max": 140.3101,
+          "mean": 139.9089,
+          "std": 0.2544,
+          "median": 139.842
+        },
+        "throughput": {
+          "tokens_per_sec": 7168684.0,
+          "millions_per_sec": 7.1687
+        }
+      }
+    ],
+    "fast_shared_memory": [
+      {
+        "name": "fast_shared_memory",
+        "batch_size": 1000,
+        "runs": 10,
+        "times_ms": {
+          "min": 0.3919,
+          "max": 0.4696,
+          "mean": 0.4152,
+          "std": 0.0258,
+          "median": 0.4025
+        },
+        "throughput": {
+          "tokens_per_sec": 2551567.0,
+          "millions_per_sec": 2.5516
+        }
+      },
+      {
+        "name": "fast_shared_memory",
+        "batch_size": 5000,
+        "runs": 10,
+        "times_ms": {
+          "min": 0.7641,
+          "max": 0.7963,
+          "mean": 0.7709,
+          "std": 0.0091,
+          "median": 0.7682
+        },
+        "throughput": {
+          "tokens_per_sec": 6543629.0,
+          "millions_per_sec": 6.5436
+        }
+      },
+      {
+        "name": "fast_shared_memory",
+        "batch_size": 10000,
+        "runs": 10,
+        "times_ms": {
+          "min": 1.3964,
+          "max": 1.9049,
+          "mean": 1.6373,
+          "std": 0.1985,
+          "median": 1.7017
+        },
+        "throughput": {
+          "tokens_per_sec": 7161472.0,
+          "millions_per_sec": 7.1615
+        }
+      },
+      {
+        "name": "fast_shared_memory",
+        "batch_size": 50000,
+        "runs": 10,
+        "times_ms": {
+          "min": 7.2619,
+          "max": 7.7073,
+          "mean": 7.3907,
+          "std": 0.1622,
+          "median": 7.3032
+        },
+        "throughput": {
+          "tokens_per_sec": 6885276.0,
+          "millions_per_sec": 6.8853
+        }
+      },
+      {
+        "name": "fast_shared_memory",
+        "batch_size": 100000,
+        "runs": 10,
+        "times_ms": {
+          "min": 14.1356,
+          "max": 14.6145,
+          "mean": 14.4067,
+          "std": 0.1659,
+          "median": 14.3567
+        },
+        "throughput": {
+          "tokens_per_sec": 7074342.0,
+          "millions_per_sec": 7.0743
+        }
+      },
+      {
+        "name": "fast_shared_memory",
+        "batch_size": 500000,
+        "runs": 10,
+        "times_ms": {
+          "min": 69.1436,
+          "max": 69.7518,
+          "mean": 69.4653,
+          "std": 0.1982,
+          "median": 69.5036
+        },
+        "throughput": {
+          "tokens_per_sec": 7231325.0,
+          "millions_per_sec": 7.2313
+        }
+      },
+      {
+        "name": "fast_shared_memory",
+        "batch_size": 1000000,
+        "runs": 10,
+        "times_ms": {
+          "min": 137.6371,
+          "max": 138.3666,
+          "mean": 137.8584,
+          "std": 0.2141,
+          "median": 137.7735
+        },
+        "throughput": {
+          "tokens_per_sec": 7265483.0,
+          "millions_per_sec": 7.2655
+        }
+      }
+    ],
+    "pytorch_sparse_lookup_v4": [
+      {
+        "name": "pytorch_sparse_lookup_v4",
+        "batch_size": 1000,
+        "runs": 10,
+        "times_ms": {
+          "min": 11.1107,
+          "max": 11.8079,
+          "mean": 11.6095,
+          "std": 0.2191,
+          "median": 11.68
+        },
+        "throughput": {
+          "tokens_per_sec": 90003.0,
+          "millions_per_sec": 0.09
+        }
+      },
+      {
+        "name": "pytorch_sparse_lookup_v4",
+        "batch_size": 5000,
+        "runs": 10,
+        "times_ms": {
+          "min": 16.7706,
+          "max": 27.436,
+          "mean": 18.2637,
+          "std": 3.0677,
+          "median": 17.3664
+        },
+        "throughput": {
+          "tokens_per_sec": 298141.0,
+          "millions_per_sec": 0.2981
+        }
+      },
+      {
+        "name": "pytorch_sparse_lookup_v4",
+        "batch_size": 10000,
+        "runs": 10,
+        "times_ms": {
+          "min": 23.6669,
+          "max": 30.9862,
+          "mean": 24.8592,
+          "std": 2.0508,
+          "median": 24.2683
+        },
+        "throughput": {
+          "tokens_per_sec": 422530.0,
+          "millions_per_sec": 0.4225
+        }
+      },
+      {
+        "name": "pytorch_sparse_lookup_v4",
+        "batch_size": 50000,
+        "runs": 10,
+        "times_ms": {
+          "min": 78.3779,
+          "max": 89.4505,
+          "mean": 80.9396,
+          "std": 3.749,
+          "median": 79.2055
+        },
+        "throughput": {
+          "tokens_per_sec": 637935.0,
+          "millions_per_sec": 0.6379
+        }
+      },
+      {
+        "name": "pytorch_sparse_lookup_v4",
+        "batch_size": 100000,
+        "runs": 10,
+        "times_ms": {
+          "min": 161.4342,
+          "max": 169.9906,
+          "mean": 163.7806,
+          "std": 3.0231,
+          "median": 162.2677
+        },
+        "throughput": {
+          "tokens_per_sec": 619448.0,
+          "millions_per_sec": 0.6194
+        }
+      },
+      {
+        "name": "pytorch_sparse_lookup_v4",
+        "batch_size": 500000,
+        "runs": 10,
+        "times_ms": {
+          "min": 775.6689,
+          "max": 777.8935,
+          "mean": 776.5852,
+          "std": 0.6073,
+          "median": 776.5502
+        },
+        "throughput": {
+          "tokens_per_sec": 644605.0,
+          "millions_per_sec": 0.6446
+        }
+      },
+      {
+        "name": "pytorch_sparse_lookup_v4",
+        "batch_size": 1000000,
+        "runs": 10,
+        "times_ms": {
+          "min": 1530.6805,
+          "max": 5249.8892,
+          "mean": 2285.9026,
+          "std": 1459.0375,
+          "median": 1569.0991
+        },
+        "throughput": {
+          "tokens_per_sec": 653304.0,
+          "millions_per_sec": 0.6533
+        }
+      }
+    ]
+  },
+  "speedups": {
+    "emergence_vectorized": [
+      {
+        "batch_size": 1000,
+        "speedup": 13.04,
+        "pytorch_ms": 11.1107,
+        "ours_ms": 0.852
+      },
+      {
+        "batch_size": 5000,
+        "speedup": 25.82,
+        "pytorch_ms": 16.7706,
+        "ours_ms": 0.6496
+      },
+      {
+        "batch_size": 10000,
+        "speedup": 18.83,
+        "pytorch_ms": 23.6669,
+        "ours_ms": 1.2571
+      },
+      {
+        "batch_size": 50000,
+        "speedup": 11.63,
+        "pytorch_ms": 78.3779,
+        "ours_ms": 6.7408
+      },
+      {
+        "batch_size": 100000,
+        "speedup": 12.37,
+        "pytorch_ms": 161.4342,
+        "ours_ms": 13.0457
+      },
+      {
+        "batch_size": 500000,
+        "speedup": 11.99,
+        "pytorch_ms": 775.6689,
+        "ours_ms": 64.7125
+      },
+      {
+        "batch_size": 1000000,
+        "speedup": 11.66,
+        "pytorch_ms": 1530.6805,
+        "ours_ms": 131.263
+      }
+    ],
+    "emergence_standard": [
+      {
+        "batch_size": 1000,
+        "speedup": 30.52,
+        "pytorch_ms": 11.1107,
+        "ours_ms": 0.364
+      },
+      {
+        "batch_size": 5000,
+        "speedup": 22.97,
+        "pytorch_ms": 16.7706,
+        "ours_ms": 0.7302
+      },
+      {
+        "batch_size": 10000,
+        "speedup": 16.95,
+        "pytorch_ms": 23.6669,
+        "ours_ms": 1.3962
+      },
+      {
+        "batch_size": 50000,
+        "speedup": 10.64,
+        "pytorch_ms": 78.3779,
+        "ours_ms": 7.3649
+      },
+      {
+        "batch_size": 100000,
+        "speedup": 11.24,
+        "pytorch_ms": 161.4342,
+        "ours_ms": 14.3681
+      },
+      {
+        "batch_size": 500000,
+        "speedup": 11.08,
+        "pytorch_ms": 775.6689,
+        "ours_ms": 69.9831
+      },
+      {
+        "batch_size": 1000000,
+        "speedup": 10.97,
+        "pytorch_ms": 1530.6805,
+        "ours_ms": 139.4956
+      }
+    ],
+    "fast_shared_memory": [
+      {
+        "batch_size": 1000,
+        "speedup": 28.35,
+        "pytorch_ms": 11.1107,
+        "ours_ms": 0.3919
+      },
+      {
+        "batch_size": 5000,
+        "speedup": 21.95,
+        "pytorch_ms": 16.7706,
+        "ours_ms": 0.7641
+      },
+      {
+        "batch_size": 10000,
+        "speedup": 16.95,
+        "pytorch_ms": 23.6669,
+        "ours_ms": 1.3964
+      },
+      {
+        "batch_size": 50000,
+        "speedup": 10.79,
+        "pytorch_ms": 78.3779,
+        "ours_ms": 7.2619
+      },
+      {
+        "batch_size": 100000,
+        "speedup": 11.42,
+        "pytorch_ms": 161.4342,
+        "ours_ms": 14.1356
+      },
+      {
+        "batch_size": 500000,
+        "speedup": 11.22,
+        "pytorch_ms": 775.6689,
+        "ours_ms": 69.1436
+      },
+      {
+        "batch_size": 1000000,
+        "speedup": 11.12,
+        "pytorch_ms": 1530.6805,
+        "ours_ms": 137.6371
+      }
+    ]
+  }
+}

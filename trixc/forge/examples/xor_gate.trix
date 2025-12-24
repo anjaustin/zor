@@ -1,0 +1,37 @@
+# TRIX Model: XOR Gate
+# A frozen XOR shape - no learning required
+#
+# The XOR is computed geometrically: a + b - 2ab
+# This is a differentiable approximation that is exact at binary inputs
+
+version: "1.0"
+name: xor_gate
+description: "Frozen XOR gate using geometric computation"
+
+input:
+  shape: [2]
+  dtype: float32
+
+output:
+  shape: [1]
+  dtype: float32
+
+shapes:
+  - name: xor
+    type: xor
+    frozen: true
+    # XOR(a, b) = a + b - 2ab
+    # Exact at binary, differentiable everywhere
+
+levers:
+  precision:
+    type: enum
+    options: [fp32, fp16]
+    default: fp32
+    description: "Precision (fp32 recommended for logic gates)"
+
+metadata:
+  author: "TRIX Forge"
+  category: "logic"
+  params: 0
+  notes: "Zero learnable parameters - pure geometry"

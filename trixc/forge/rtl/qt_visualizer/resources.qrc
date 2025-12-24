@@ -1,0 +1,9 @@
+<RCC>
+    <qresource prefix="/">
+        <file>Main.qml</file>
+        <file>TopologyView.qml</file>
+        <file>NodeGlyph.qml</file>
+        <file>LayerView.qml</file>
+        <file>MetricsPanel.qml</file>
+    </qresource>
+</RCC>
