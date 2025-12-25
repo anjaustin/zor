@@ -197,11 +197,16 @@ gcc -O3 -o gillies_vulkan_bench gillies_vulkan_bench.c -lvulkan -lm
 - [ ] Frozen network execution on GPU
 - [ ] Dynamic shape dispatch
 
+## See Also
+
+- [EXECUTION_STACK.md](EXECUTION_STACK.md) - The full execution stack (HSOS → GILLIES → Vulkan)
+- [HSOS Module](../src/trix/hsos/) - Hollywood Squares OS source
+
 ## References
 
 - [Vulkan Specification](https://www.khronos.org/registry/vulkan/specs/1.3/html/)
 - [SPIR-V Specification](https://www.khronos.org/registry/SPIR-V/specs/unified1/SPIRV.html)
-- TriX Frozen Shapes: `/workspace/ZOR/src/trix/nn/frozen_shapes.py`
+- TriX Frozen Shapes: `src/trix/nn/frozen_shapes.py`
 
 ---
 

@@ -514,6 +514,7 @@ See [THE_WAY.md](docs/THE_WAY.md) for the full philosophy.
 ### Core
 
 - [THE_WAY.md](docs/THE_WAY.md) - **The unified philosophy** (start here)
+- [EXECUTION_STACK.md](docs/EXECUTION_STACK.md) - **HSOS → GILLIES → Vulkan** (the performance stack)
 - [SHAPE_SUBSTRATE.md](docs/SHAPE_SUBSTRATE.md) - **Universal substrate for neural-geometric shapes**
 - [ABSTRACT.md](docs/ABSTRACT.md) - Formal abstract
 - [Architecture Guide](docs/ARCHITECTURE.md) - System design and routing mechanics
