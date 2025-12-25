@@ -1,0 +1,14 @@
+{
+  "table": {
+    "0": 0,
+    "1": 1,
+    "2": 2,
+    "3": 3
+  },
+  "shapes": ["add", "sub", "xor", "and"],
+  "metadata": {
+    "name": "alu_4op",
+    "description": "Simple 4-operation ALU",
+    "created": "2025-12-25"
+  }
+}

@@ -814,9 +814,152 @@ int trix_6502_step(trix_6502_t *cpu) {{
     uint8_t opcode = cpu->read(cpu->pc++, cpu->ctx);
     uint8_t shape_id = SHAPE_TABLE[opcode];
 
-    /* Handle invalid/unimplemented opcodes */
+    /* Handle control flow opcodes (branches, jumps, stack, flags) */
     if (shape_id == SHAPE_INVALID) {{
-        /* TODO: Handle branches, jumps, stack ops, flag ops */
+        switch (opcode) {{
+            /* ============================================
+             * FLAG SET/CLEAR - Just bit manipulation
+             * ============================================ */
+            case 0x18: cpu->c = 0; break;  /* CLC */
+            case 0x38: cpu->c = 1; break;  /* SEC */
+            case 0x58: cpu->i = 0; break;  /* CLI */
+            case 0x78: cpu->i = 1; break;  /* SEI */
+            case 0xB8: cpu->v = 0; break;  /* CLV */
+            case 0xD8: cpu->d = 0; break;  /* CLD */
+            case 0xF8: cpu->d = 1; break;  /* SED */
+
+            /* ============================================
+             * STACK OPERATIONS - Push/pull A and P
+             * ============================================ */
+            case 0x48:  /* PHA - Push A */
+                cpu->write(0x100 + cpu->sp--, cpu->a, cpu->ctx);
+                cpu->cycles += 1;
+                break;
+            case 0x68:  /* PLA - Pull A */
+                cpu->a = cpu->read(0x100 + ++cpu->sp, cpu->ctx);
+                cpu->n = (cpu->a >> 7) & 1;
+                cpu->z = (cpu->a == 0);
+                cpu->cycles += 2;
+                break;
+            case 0x08:  /* PHP - Push P */
+                cpu->write(0x100 + cpu->sp--, trix_6502_get_status(cpu) | 0x30, cpu->ctx);
+                cpu->cycles += 1;
+                break;
+            case 0x28:  /* PLP - Pull P */
+                trix_6502_set_status(cpu, cpu->read(0x100 + ++cpu->sp, cpu->ctx));
+                cpu->cycles += 2;
+                break;
+
+            /* ============================================
+             * BRANCH OPERATIONS - Conditional PC modification
+             * ============================================ */
+            case 0x10:  /* BPL - Branch if Plus */
+            case 0x30:  /* BMI - Branch if Minus */
+            case 0x50:  /* BVC - Branch if Overflow Clear */
+            case 0x70:  /* BVS - Branch if Overflow Set */
+            case 0x90:  /* BCC - Branch if Carry Clear */
+            case 0xB0:  /* BCS - Branch if Carry Set */
+            case 0xD0:  /* BNE - Branch if Not Equal */
+            case 0xF0:  /* BEQ - Branch if Equal */
+                {{
+                    int8_t offset = (int8_t)cpu->read(cpu->pc++, cpu->ctx);
+                    int take = 0;
+                    switch (opcode) {{
+                        case 0x10: take = !cpu->n; break;  /* BPL */
+                        case 0x30: take = cpu->n;  break;  /* BMI */
+                        case 0x50: take = !cpu->v; break;  /* BVC */
+                        case 0x70: take = cpu->v;  break;  /* BVS */
+                        case 0x90: take = !cpu->c; break;  /* BCC */
+                        case 0xB0: take = cpu->c;  break;  /* BCS */
+                        case 0xD0: take = !cpu->z; break;  /* BNE */
+                        case 0xF0: take = cpu->z;  break;  /* BEQ */
+                    }}
+                    if (take) {{
+                        uint16_t old_pc = cpu->pc;
+                        cpu->pc += offset;
+                        cpu->cycles += ((old_pc ^ cpu->pc) & 0xFF00) ? 2 : 1;
+                    }}
+                }}
+                break;
+
+            /* ============================================
+             * JUMP OPERATIONS - Unconditional PC modification
+             * ============================================ */
+            case 0x4C:  /* JMP absolute */
+                {{
+                    uint16_t lo = cpu->read(cpu->pc++, cpu->ctx);
+                    uint16_t hi = cpu->read(cpu->pc, cpu->ctx);
+                    cpu->pc = lo | (hi << 8);
+                }}
+                break;
+            case 0x6C:  /* JMP indirect */
+                {{
+                    uint16_t ptr_lo = cpu->read(cpu->pc++, cpu->ctx);
+                    uint16_t ptr_hi = cpu->read(cpu->pc, cpu->ctx);
+                    uint16_t ptr = ptr_lo | (ptr_hi << 8);
+                    /* 6502 bug: wraps within page */
+                    uint16_t lo = cpu->read(ptr, cpu->ctx);
+                    uint16_t hi = cpu->read((ptr & 0xFF00) | ((ptr + 1) & 0xFF), cpu->ctx);
+                    cpu->pc = lo | (hi << 8);
+                    cpu->cycles += 2;
+                }}
+                break;
+            case 0x20:  /* JSR - Jump to Subroutine */
+                {{
+                    uint16_t lo = cpu->read(cpu->pc++, cpu->ctx);
+                    uint16_t hi = cpu->read(cpu->pc, cpu->ctx);
+                    /* Push return address - 1 */
+                    cpu->write(0x100 + cpu->sp--, (cpu->pc >> 8) & 0xFF, cpu->ctx);
+                    cpu->write(0x100 + cpu->sp--, cpu->pc & 0xFF, cpu->ctx);
+                    cpu->pc = lo | (hi << 8);
+                    cpu->cycles += 4;
+                }}
+                break;
+            case 0x60:  /* RTS - Return from Subroutine */
+                {{
+                    uint16_t lo = cpu->read(0x100 + ++cpu->sp, cpu->ctx);
+                    uint16_t hi = cpu->read(0x100 + ++cpu->sp, cpu->ctx);
+                    cpu->pc = (lo | (hi << 8)) + 1;
+                    cpu->cycles += 4;
+                }}
+                break;
+            case 0x40:  /* RTI - Return from Interrupt */
+                {{
+                    trix_6502_set_status(cpu, cpu->read(0x100 + ++cpu->sp, cpu->ctx));
+                    uint16_t lo = cpu->read(0x100 + ++cpu->sp, cpu->ctx);
+                    uint16_t hi = cpu->read(0x100 + ++cpu->sp, cpu->ctx);
+                    cpu->pc = lo | (hi << 8);
+                    cpu->cycles += 4;
+                }}
+                break;
+
+            /* ============================================
+             * BRK - Software Interrupt
+             * ============================================ */
+            case 0x00:  /* BRK */
+                cpu->pc++;  /* Skip padding byte */
+                cpu->write(0x100 + cpu->sp--, (cpu->pc >> 8) & 0xFF, cpu->ctx);
+                cpu->write(0x100 + cpu->sp--, cpu->pc & 0xFF, cpu->ctx);
+                cpu->write(0x100 + cpu->sp--, trix_6502_get_status(cpu) | 0x30, cpu->ctx);
+                cpu->i = 1;
+                {{
+                    uint16_t lo = cpu->read(0xFFFE, cpu->ctx);
+                    uint16_t hi = cpu->read(0xFFFF, cpu->ctx);
+                    cpu->pc = lo | (hi << 8);
+                }}
+                cpu->cycles += 5;
+                break;
+
+            /* ============================================
+             * NOP - No Operation (various illegal NOPs too)
+             * ============================================ */
+            case 0xEA:  /* NOP */
+                break;
+
+            default:
+                /* Unknown opcode - treat as NOP */
+                break;
+        }}
         cpu->cycles += 2;
         return 2;
     }}
