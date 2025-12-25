@@ -1,6 +1,20 @@
 """
 Frozen 6502: 16 Shapes for CPU Emulation
 
+DEPRECATED: Use trix.native.FrozenALU instead.
+
+    # Old (PyTorch):
+    from trix.nn.frozen_6502 import ShapeID, create_frozen_6502
+
+    # New (Native):
+    from trix.native import FrozenALU, NativeFrozenHybrid
+    model = NativeFrozenHybrid()
+    model.train_supervised()  # Learns opcode->shape mapping
+
+The Native version has no PyTorch dependency and exports directly to C.
+
+---
+
 This module provides the 16 frozen computation shapes needed to emulate
 a 6502 CPU's ALU operations with 100% accuracy and ~40x compression.
 
@@ -30,6 +44,15 @@ See also:
     - docs/OPCODE_MAP.md for opcode reference
     - docs/ATOMIC_FUNCTIONS.md for mathematical foundations
 """
+
+import warnings
+warnings.warn(
+    "trix.nn.frozen_6502 is deprecated for execution. "
+    "Use trix.native.FrozenALU for inference (no PyTorch needed). "
+    "trix.nn.frozen_6502 remains valid for gradient-based training.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 import torch
 import torch.nn as nn

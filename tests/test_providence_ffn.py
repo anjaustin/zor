@@ -11,6 +11,7 @@ Tests cover:
 - Soft vs hard routing modes
 """
 
+import warnings
 import pytest
 import torch
 import torch.nn as nn
@@ -22,7 +23,12 @@ from trix.nn.providence import (
     create_providence_ffn,
     create_frozen_providence_ffn,
 )
-from trix.nn.frozen_shapes import Primitives
+
+# Providence is a PyTorch module that uses frozen shapes for gradient-based training.
+# The deprecation warning is for execution-only use cases; training is still valid.
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    from trix.nn.frozen_shapes import Primitives
 
 
 # =============================================================================

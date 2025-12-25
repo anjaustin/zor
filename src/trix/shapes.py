@@ -13,17 +13,12 @@ Usage:
     >>> add(127, 1, verbose=True)  # Shows the geometry
 
 The shapes ARE the computation. No learning, just math.
+
+This module is pure Python - no PyTorch, no NumPy, no dependencies.
+The mathematical truths don't need a framework.
 """
 
 from typing import Tuple, List, Optional
-import torch
-
-from trix.nn.frozen_6502 import (
-    FrozenShapes6502,
-    int_to_bits,
-    bits_to_int,
-    ShapeID,
-)
 
 
 # =============================================================================
@@ -175,16 +170,14 @@ def add(a: int, b: int, carry: int = 0, verbose: bool = False) -> int:
         >>> add(255, 1)  # Overflow wraps
         0
     """
-    a_bits = int_to_bits(torch.tensor([a & 0xFF]))
-    b_bits = int_to_bits(torch.tensor([b & 0xFF]))
-    c_in = torch.tensor([float(carry & 1)])
+    a = a & 0xFF
+    b = b & 0xFF
+    carry = carry & 1
 
-    out = FrozenShapes6502.ripple_add(a_bits, b_bits, c_in)
-    result = int(bits_to_int(out['result']).item())
-    carry_out = int(out['carry'].item())
+    result = (a + b + carry) & 0xFF
 
     if verbose:
-        _print_shape_info('RIPPLE_ADD', {'a': a, 'b': b, 'carry_in': carry}, result, carry_out)
+        _print_shape_info('RIPPLE_ADD', {'a': a, 'b': b, 'carry_in': carry}, result, (a + b + carry) >> 8)
 
     return result
 
@@ -201,13 +194,13 @@ def add_with_carry(a: int, b: int, carry: int = 0, verbose: bool = False) -> Tup
     Returns:
         (result, carry_out)
     """
-    a_bits = int_to_bits(torch.tensor([a & 0xFF]))
-    b_bits = int_to_bits(torch.tensor([b & 0xFF]))
-    c_in = torch.tensor([float(carry & 1)])
+    a = a & 0xFF
+    b = b & 0xFF
+    carry = carry & 1
 
-    out = FrozenShapes6502.ripple_add(a_bits, b_bits, c_in)
-    result = int(bits_to_int(out['result']).item())
-    carry_out = int(out['carry'].item())
+    full = a + b + carry
+    result = full & 0xFF
+    carry_out = (full >> 8) & 1
 
     if verbose:
         _print_shape_info('RIPPLE_ADD', {'a': a, 'b': b, 'carry_in': carry}, result, carry_out)
@@ -231,13 +224,11 @@ def sub(a: int, b: int, borrow: int = 0, verbose: bool = False) -> int:
     Returns:
         Result of a - b - borrow (mod 256)
     """
-    a_bits = int_to_bits(torch.tensor([a & 0xFF]))
-    b_bits = int_to_bits(torch.tensor([b & 0xFF]))
-    # 6502: carry=1 means no borrow, carry=0 means borrow
-    c_in = torch.tensor([float(1 - (borrow & 1))])
+    a = a & 0xFF
+    b = b & 0xFF
+    borrow = borrow & 1
 
-    out = FrozenShapes6502.ripple_sub(a_bits, b_bits, c_in)
-    result = int(bits_to_int(out['result']).item())
+    result = (a - b - borrow) & 0xFF
 
     if verbose:
         _print_shape_info('RIPPLE_SUB', {'a': a, 'b': b, 'borrow': borrow}, result)
@@ -258,10 +249,8 @@ def inc(a: int, verbose: bool = False) -> int:
     Returns:
         a + 1 (mod 256)
     """
-    a_bits = int_to_bits(torch.tensor([a & 0xFF]))
-
-    out = FrozenShapes6502.increment(a_bits)
-    result = int(bits_to_int(out['result']).item())
+    a = a & 0xFF
+    result = (a + 1) & 0xFF
 
     if verbose:
         _print_shape_info('INCREMENT', {'a': a}, result)
@@ -282,10 +271,8 @@ def dec(a: int, verbose: bool = False) -> int:
     Returns:
         a - 1 (mod 256)
     """
-    a_bits = int_to_bits(torch.tensor([a & 0xFF]))
-
-    out = FrozenShapes6502.decrement(a_bits)
-    result = int(bits_to_int(out['result']).item())
+    a = a & 0xFF
+    result = (a - 1) & 0xFF
 
     if verbose:
         _print_shape_info('DECREMENT', {'a': a}, result)
@@ -310,11 +297,9 @@ def and_op(a: int, b: int, verbose: bool = False) -> int:
     Returns:
         a AND b
     """
-    a_bits = int_to_bits(torch.tensor([a & 0xFF]))
-    b_bits = int_to_bits(torch.tensor([b & 0xFF]))
-
-    out = FrozenShapes6502.parallel_and(a_bits, b_bits)
-    result = int(bits_to_int(out['result']).item())
+    a = a & 0xFF
+    b = b & 0xFF
+    result = a & b
 
     if verbose:
         _print_shape_info('PARALLEL_AND', {'a': a, 'b': b}, result)
@@ -335,11 +320,9 @@ def or_op(a: int, b: int, verbose: bool = False) -> int:
     Returns:
         a OR b
     """
-    a_bits = int_to_bits(torch.tensor([a & 0xFF]))
-    b_bits = int_to_bits(torch.tensor([b & 0xFF]))
-
-    out = FrozenShapes6502.parallel_or(a_bits, b_bits)
-    result = int(bits_to_int(out['result']).item())
+    a = a & 0xFF
+    b = b & 0xFF
+    result = a | b
 
     if verbose:
         _print_shape_info('PARALLEL_OR', {'a': a, 'b': b}, result)
@@ -360,11 +343,9 @@ def xor(a: int, b: int, verbose: bool = False) -> int:
     Returns:
         a XOR b
     """
-    a_bits = int_to_bits(torch.tensor([a & 0xFF]))
-    b_bits = int_to_bits(torch.tensor([b & 0xFF]))
-
-    out = FrozenShapes6502.parallel_xor(a_bits, b_bits)
-    result = int(bits_to_int(out['result']).item())
+    a = a & 0xFF
+    b = b & 0xFF
+    result = a ^ b
 
     if verbose:
         _print_shape_info('PARALLEL_XOR', {'a': a, 'b': b}, result)
@@ -389,11 +370,9 @@ def asl(a: int, verbose: bool = False) -> Tuple[int, int]:
     Returns:
         (result, carry_out)
     """
-    a_bits = int_to_bits(torch.tensor([a & 0xFF]))
-
-    out = FrozenShapes6502.shift_left(a_bits)
-    result = int(bits_to_int(out['result']).item())
-    carry_out = int(out['carry'].item())
+    a = a & 0xFF
+    carry_out = (a >> 7) & 1
+    result = (a << 1) & 0xFF
 
     if verbose:
         _print_shape_info('SHIFT_LEFT', {'a': a}, result, carry_out)
@@ -414,11 +393,9 @@ def lsr(a: int, verbose: bool = False) -> Tuple[int, int]:
     Returns:
         (result, carry_out)
     """
-    a_bits = int_to_bits(torch.tensor([a & 0xFF]))
-
-    out = FrozenShapes6502.shift_right(a_bits)
-    result = int(bits_to_int(out['result']).item())
-    carry_out = int(out['carry'].item())
+    a = a & 0xFF
+    carry_out = a & 1
+    result = (a >> 1) & 0xFF
 
     if verbose:
         _print_shape_info('SHIFT_RIGHT', {'a': a}, result, carry_out)
@@ -440,12 +417,10 @@ def rol(a: int, carry: int = 0, verbose: bool = False) -> Tuple[int, int]:
     Returns:
         (result, carry_out)
     """
-    a_bits = int_to_bits(torch.tensor([a & 0xFF]))
-    c_in = torch.tensor([float(carry & 1)])
-
-    out = FrozenShapes6502.rotate_left(a_bits, c_in)
-    result = int(bits_to_int(out['result']).item())
-    carry_out = int(out['carry'].item())
+    a = a & 0xFF
+    carry = carry & 1
+    carry_out = (a >> 7) & 1
+    result = ((a << 1) | carry) & 0xFF
 
     if verbose:
         _print_shape_info('ROTATE_LEFT', {'a': a, 'carry_in': carry}, result, carry_out)
@@ -467,12 +442,10 @@ def ror(a: int, carry: int = 0, verbose: bool = False) -> Tuple[int, int]:
     Returns:
         (result, carry_out)
     """
-    a_bits = int_to_bits(torch.tensor([a & 0xFF]))
-    c_in = torch.tensor([float(carry & 1)])
-
-    out = FrozenShapes6502.rotate_right(a_bits, c_in)
-    result = int(bits_to_int(out['result']).item())
-    carry_out = int(out['carry'].item())
+    a = a & 0xFF
+    carry = carry & 1
+    carry_out = a & 1
+    result = ((a >> 1) | (carry << 7)) & 0xFF
 
     if verbose:
         _print_shape_info('ROTATE_RIGHT', {'a': a, 'carry_in': carry}, result, carry_out)
@@ -532,6 +505,7 @@ def demo():
 
     print("=" * 52)
     print("  The shapes ARE the computation. No learning.")
+    print("  Pure Python. No frameworks. Just math.")
     print("=" * 52)
 
 

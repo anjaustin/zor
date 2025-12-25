@@ -1,6 +1,21 @@
 """
 Frozen Shapes Library - General-Purpose Mathematical Shapes
 
+DEPRECATED: Use trix.native.FrozenShapes instead.
+
+    # Old (PyTorch):
+    from trix.nn.frozen_shapes import Primitives
+    result = Primitives.xor(a, b)
+
+    # New (Native):
+    from trix.native import FrozenShapes
+    result = FrozenShapes.xor(a, b)
+
+The Native version works with CuPy (GPU) or NumPy (CPU) and has no
+PyTorch dependency. Same API, same math, fewer dependencies.
+
+---
+
 A library of frozen (non-learnable) computation shapes beyond 6502.
 These are mathematical truths expressed as continuous polynomials:
 - 100% accurate on binary inputs
@@ -27,6 +42,15 @@ Example:
     >>> shapes.xor(torch.tensor([0., 1.]), torch.tensor([1., 0.]))
     tensor([1., 1.])
 """
+
+import warnings
+warnings.warn(
+    "trix.nn.frozen_shapes is deprecated for execution. "
+    "Use trix.native.FrozenShapes for inference (no PyTorch needed). "
+    "trix.nn.frozen_shapes remains valid for gradient-based training.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 import torch
 import torch.nn as nn

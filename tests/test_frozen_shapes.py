@@ -9,23 +9,31 @@ Tests cover:
 - Composition shapes
 - Shape library
 - Gradient flow
+
+Note: These tests use PyTorch frozen_shapes for gradient flow testing.
+For execution-only use cases, see trix.native.FrozenShapes.
 """
 
+import warnings
 import pytest
 import torch
 import math
 
-from trix.nn.frozen_shapes import (
-    Primitives,
-    LogicShapes,
-    ComparisonShapes,
-    ActivationShapes,
-    ArithmeticShapes,
-    CompositionShapes,
-    FrozenShapeLibrary,
-    GeneralFrozenTile,
-    get_library,
-)
+# Suppress deprecation warning - these tests explicitly test gradient flow
+# which requires PyTorch. The warning is for execution-only use cases.
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    from trix.nn.frozen_shapes import (
+        Primitives,
+        LogicShapes,
+        ComparisonShapes,
+        ActivationShapes,
+        ArithmeticShapes,
+        CompositionShapes,
+        FrozenShapeLibrary,
+        GeneralFrozenTile,
+        get_library,
+    )
 
 
 # =============================================================================

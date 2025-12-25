@@ -11,7 +11,7 @@ import sys
 def wait_for_user():
     """Wait for user input in interactive mode, skip otherwise."""
     if sys.stdin.isatty():
-        wait_for_user()
+        input("  Press Enter to see answers...")
     else:
         print("  (Answers below)")
 

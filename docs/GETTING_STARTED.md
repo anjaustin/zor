@@ -97,25 +97,50 @@ cd trixc/forge/gillies/zit && make && ./zit_demo
 
 ### Python API (TriX)
 
+TriX has three layers - choose based on your needs:
+
+| Module | Dependencies | Use Case |
+|--------|--------------|----------|
+| `trix.shapes` | **None** (pure Python) | Simple computation, scripting |
+| `trix.native` | NumPy (CuPy for training) | Inference, export to C |
+| `trix.nn` | PyTorch | Gradient-based training |
+
+#### Pure Python (Zero Dependencies)
+
 ```python
-import trix
+from trix.shapes import add, xor, inc
 
-# Create a model with ternary routing
-model = trix.TrixModel(
-    input_dim=784,
-    hidden_dim=256,
-    num_experts=8
-)
+# Compute with frozen shapes
+result = add(42, 13)      # 55
+result = xor(0xFF, 0x55)  # 170 (0xAA)
+result = inc(255)         # 0 (wraps)
 
-# Train like normal PyTorch
-optimizer = torch.optim.Adam(model.parameters())
-for batch in dataloader:
-    loss = model(batch)
-    loss.backward()
-    optimizer.step()
+# Show the geometry
+add(42, 13, verbose=True)  # Prints 8-bit ripple adder diagram
+```
 
-# Signatures emerge automatically
-# Similar inputs route to similar experts
+#### Native (CuPy/NumPy)
+
+```python
+from trix.native import NativeFrozenHybrid, FrozenALU
+
+# Frozen shapes + learned routing
+model = NativeFrozenHybrid()
+model.train_supervised()  # Learns opcode->shape mapping
+# 0 params in shapes, ~176 in routing, 100% accuracy
+```
+
+#### PyTorch (Gradient Training)
+
+```python
+from trix import HierarchicalTriXFFN
+
+# Drop-in FFN replacement
+ffn = HierarchicalTriXFFN(d_model=512, num_tiles=64)
+output, routing_info, aux_losses = ffn(x)
+
+# Train with auxiliary losses for balanced routing
+loss = task_loss + aux_losses['total_aux']
 ```
 
 See: `docs/QUICKSTART.md` for full tutorial

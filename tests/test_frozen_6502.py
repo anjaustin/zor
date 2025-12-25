@@ -5,26 +5,34 @@ Integration tests for the 16 frozen shapes for 6502 CPU emulation.
 All tests validate 100% accuracy on ALU operations.
 
 These tests prove the core thesis: "Computation is topology. Learning is routing."
+
+Note: These tests use PyTorch frozen_6502 for gradient flow and nn.Module testing.
+For execution-only use cases, see trix.native.FrozenALU.
 """
 
+import warnings
 import pytest
 import torch
 import torch.nn as nn
 
-from trix.nn.frozen_6502 import (
-    ShapeID,
-    RegisterID,
-    PureMath,
-    FrozenShapes6502,
-    FlagComputer,
-    Frozen6502Tile,
-    Frozen6502,
-    OPCODE_SPECS,
-    int_to_bits,
-    bits_to_int,
-    create_frozen_6502,
-    NUM_SHAPES,
-)
+# Suppress deprecation warning - these tests explicitly test PyTorch nn.Modules
+# which require gradient flow. The warning is for execution-only use cases.
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    from trix.nn.frozen_6502 import (
+        ShapeID,
+        RegisterID,
+        PureMath,
+        FrozenShapes6502,
+        FlagComputer,
+        Frozen6502Tile,
+        Frozen6502,
+        OPCODE_SPECS,
+        int_to_bits,
+        bits_to_int,
+        create_frozen_6502,
+        NUM_SHAPES,
+    )
 
 
 class TestPureMath:
