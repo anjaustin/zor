@@ -1,0 +1,99 @@
+; SPIR-V
+; Version: 1.0
+; Generator: Hand-written
+; Bound: 50
+; Schema: 0
+
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main" %gl_GlobalInvocationID
+               OpExecutionMode %main LocalSize 256 1 1
+
+               ; Decorations
+               OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+
+               ; Buffer A decorations
+               OpDecorate %arr_a ArrayStride 4
+               OpMemberDecorate %BufferA 0 Offset 0
+               OpDecorate %BufferA BufferBlock
+               OpDecorate %bufA DescriptorSet 0
+               OpDecorate %bufA Binding 0
+
+               ; Buffer B decorations
+               OpDecorate %arr_b ArrayStride 4
+               OpMemberDecorate %BufferB 0 Offset 0
+               OpDecorate %BufferB BufferBlock
+               OpDecorate %bufB DescriptorSet 0
+               OpDecorate %bufB Binding 1
+
+               ; Buffer Out decorations
+               OpDecorate %arr_out ArrayStride 4
+               OpMemberDecorate %BufferOut 0 Offset 0
+               OpDecorate %BufferOut BufferBlock
+               OpDecorate %bufOut DescriptorSet 0
+               OpDecorate %bufOut Binding 2
+
+       ; Types
+       %void = OpTypeVoid
+   %funcType = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+      %uint3 = OpTypeVector %uint 3
+  %ptr_uint3 = OpTypePointer Input %uint3
+   %ptr_uint = OpTypePointer Input %uint
+      %float = OpTypeFloat 32
+      %int   = OpTypeInt 32 1
+     %int_0  = OpConstant %int 0
+   %float_2  = OpConstant %float 2.0
+
+      ; Runtime arrays
+      %arr_a = OpTypeRuntimeArray %float
+      %arr_b = OpTypeRuntimeArray %float
+    %arr_out = OpTypeRuntimeArray %float
+
+      ; Buffer structs
+    %BufferA = OpTypeStruct %arr_a
+    %BufferB = OpTypeStruct %arr_b
+  %BufferOut = OpTypeStruct %arr_out
+
+      ; Buffer pointers (using Uniform for SSBO compatibility)
+ %ptr_BufferA = OpTypePointer Uniform %BufferA
+ %ptr_BufferB = OpTypePointer Uniform %BufferB
+%ptr_BufferOut = OpTypePointer Uniform %BufferOut
+
+      ; Float pointer in uniform
+  %ptr_float = OpTypePointer Uniform %float
+
+      ; Global variables
+%gl_GlobalInvocationID = OpVariable %ptr_uint3 Input
+       %bufA = OpVariable %ptr_BufferA Uniform
+       %bufB = OpVariable %ptr_BufferB Uniform
+      %bufOut = OpVariable %ptr_BufferOut Uniform
+
+      ; Main function
+       %main = OpFunction %void None %funcType
+      %entry = OpLabel
+
+      ; Get global invocation ID (x component)
+     %gidPtr = OpAccessChain %ptr_uint %gl_GlobalInvocationID %int_0
+        %gid = OpLoad %uint %gidPtr
+
+      ; Load a[idx]
+    %ptrA = OpAccessChain %ptr_float %bufA %int_0 %gid
+      %a = OpLoad %float %ptrA
+
+      ; Load b[idx]
+    %ptrB = OpAccessChain %ptr_float %bufB %int_0 %gid
+      %b = OpLoad %float %ptrB
+
+      ; Compute XOR: a + b - 2*a*b
+    %sum = OpFAdd %float %a %b
+   %prod = OpFMul %float %a %b
+  %twice = OpFMul %float %float_2 %prod
+ %result = OpFSub %float %sum %twice
+
+      ; Store result
+   %ptrOut = OpAccessChain %ptr_float %bufOut %int_0 %gid
+             OpStore %ptrOut %result
+
+             OpReturn
+             OpFunctionEnd
