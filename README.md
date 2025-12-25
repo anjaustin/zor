@@ -7,7 +7,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch 2.0+](https://img.shields.io/badge/pytorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-400%2B%20passed-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-1434%20passed-brightgreen.svg)](#testing)
 
 ---
 
@@ -173,6 +173,39 @@ Train atoms once. Compose molecules forever. Let proteins fold.
 ```
 
 See [Shape Substrate](docs/SHAPE_SUBSTRATE.md) | [Abstract](docs/ABSTRACT.md) | [Experiments](experiments/shape_substrate/)
+
+---
+
+## GILLIES Vulkan: 19 Billion Ops/Sec on GPU
+
+**Shapes running on GPU silicon at 19 billion operations per second.**
+
+When CUDA proved incompatible with Thor's Blackwell GPU, we bypassed it entirely and built a Vulkan compute pipeline. The XOR shape `a + b - 2ab` now executes directly on GPU cores.
+
+```
+HSOS (Python)     →     3.2 M ops/sec    (interpreted)
+GILLIES (C)       →   900 M ops/sec    (compiled)
+GILLIES (Vulkan)  → 19,000 M ops/sec    (GPU compute)
+```
+
+**Rigorous Verification (50 runs, 16M elements):**
+
+| Metric | Value |
+|--------|-------|
+| Median | **19.02 B ops/sec** |
+| StdDev | 4.69% |
+| Correctness | **0 errors** / 33M tests |
+| Bandwidth | 228 GB/sec |
+
+```bash
+# Run the benchmark
+cd src/trix/native/vulkan
+make && ./gillies_vulkan_bench
+```
+
+**The shape doesn't care about the substrate.** Same polynomial, whether executed by Python interpreter, C compiler, or GPU shader.
+
+See [GILLIES Vulkan Documentation](docs/GILLIES_VULKAN.md) for full details.
 
 ---
 
@@ -392,7 +425,7 @@ TriXO/
 
 ## Testing
 
-TriX includes a comprehensive test suite with **400+ tests** including 67 rigorous stress tests.
+TriX includes a comprehensive test suite with **1434 tests** covering all components.
 
 ### Quick Start
 
@@ -414,12 +447,13 @@ python scripts/run_tests.py
 
 | Suite | Tests | Description |
 |-------|-------|-------------|
-| `quick` | ~3 | Fast smoke test |
-| `core` | ~80 | Core TriX architecture |
-| `providence` | 237 | Providence unified architecture |
-| `rigorous` | 67 | Edge cases, stress tests, invariants |
-| `frozen` | ~100 | Frozen shapes and 6502 |
-| `all` | 400+ | Everything |
+| `trix.shapes` | 41 | Pure Python frozen shapes |
+| `trix.native` | 23 | Native CuPy/NumPy execution |
+| `frozen` | 119 | Frozen shapes and 6502 |
+| `providence` | 86 | Providence unified architecture |
+| `onramp` | 10 | Tutorial E2E tests |
+| `forge` | 15 | Foundry/Forge compiler |
+| `all` | 1434 | Everything |
 
 ### What's Tested
 
