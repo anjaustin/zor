@@ -21,29 +21,50 @@ import math
 
 class TernarySpline2D(nn.Module):
     """
-    2D Spline with ternary coefficients.
+    2D Spline with ternary coefficients (Gradient Truth version).
     
     Each cell has: base, slope_a, slope_b in {-1, 0, +1}
     Plus a learned scale factor.
     
     Output = scale * (base + slope_a * local_a + slope_b * local_b)
+    
+    Gradient Truth paradigm:
+    - Ternary coefficients are FROZEN (discovered at init, not learned)
+    - Only the scale is learned (continuous, real gradients)
+    - No STE needed - mathematically correct training
+    
+    Args:
+        grid_size: Resolution of the spline grid
+        use_gradient_truth: If True (default), freeze coefficients. 
+                           If False, use legacy STE mode.
     """
     
-    def __init__(self, grid_size: int = 16):
+    def __init__(self, grid_size: int = 16, use_gradient_truth: bool = True):
         super().__init__()
         self.grid_size = grid_size
+        self.use_gradient_truth = use_gradient_truth
         
-        # Learnable continuous params (quantized during forward)
-        self.coeffs = nn.Parameter(torch.randn(grid_size, grid_size, 3) * 0.5)
+        # Initialize ternary coefficients
+        init_coeffs = torch.randn(grid_size, grid_size, 3) * 0.5
+        
+        if use_gradient_truth:
+            # Gradient Truth: Freeze coefficients as ternary
+            frozen_coeffs = torch.sign(init_coeffs)
+            self.register_buffer('coeffs', frozen_coeffs)
+        else:
+            # Legacy STE mode (deprecated)
+            self.coeffs = nn.Parameter(init_coeffs)
+        
+        # Scale is always learned (this is where gradients flow)
         self.scale = nn.Parameter(torch.ones(1))
     
     def _quantize_ternary(self, x: torch.Tensor) -> torch.Tensor:
-        """Quantize to {-1, 0, +1} with straight-through estimator."""
+        """Quantize to {-1, 0, +1} with straight-through estimator (legacy)."""
         with torch.no_grad():
             q = torch.zeros_like(x)
             q[x > 0.3] = 1.0
             q[x < -0.3] = -1.0
-        return x + (q - x).detach()  # STE: forward uses q, backward uses x
+        return x + (q - x).detach()
     
     def forward(self, a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
         """
@@ -58,8 +79,11 @@ class TernarySpline2D(nn.Module):
         idx_a = ((a + 1) / 2 * self.grid_size).long().clamp(0, self.grid_size - 1)
         idx_b = ((b + 1) / 2 * self.grid_size).long().clamp(0, self.grid_size - 1)
         
-        # Quantize coefficients
-        q_coeffs = self._quantize_ternary(self.coeffs)
+        # Get coefficients (frozen or quantized)
+        if self.use_gradient_truth:
+            q_coeffs = self.coeffs  # Already ternary, frozen
+        else:
+            q_coeffs = self._quantize_ternary(self.coeffs)  # STE (deprecated)
         
         # Gather cell coefficients
         cell_coeffs = q_coeffs[idx_a, idx_b]  # [batch, 3]
@@ -72,7 +96,9 @@ class TernarySpline2D(nn.Module):
         local_a = ((a + 1) - idx_a.float() * cell_size) / cell_size
         local_b = ((b + 1) - idx_b.float() * cell_size) / cell_size
         
-        # Spline evaluation
+        # Spline evaluation: ternary computation, no multiply needed
+        # base, slope_a, slope_b ∈ {-1, 0, +1}
+        # result = base + slope_a * local_a + slope_b * local_b
         result = base + slope_a * local_a + slope_b * local_b
         
         return result * self.scale
@@ -104,7 +130,7 @@ class FloatSpline2D(nn.Module):
 
 class SparseLookupFFN(nn.Module):
     """
-    Sparse Lookup Feed-Forward Network.
+    Sparse Lookup Feed-Forward Network (MatMul-Free).
     
     Core insight: Routing selects a direction. Spline selects magnitude.
     No matrix multiplies in the hot path.
@@ -116,6 +142,12 @@ class SparseLookupFFN(nn.Module):
         4. Output: scale × direction[tile_idx]
         5. Residual: input + output
     
+    Gradient Truth mode (default):
+        - Tile directions are FROZEN (ternary, discovered at init)
+        - Spline coefficients are FROZEN (ternary)
+        - Only compression network and spline scales are learned
+        - No STE needed - mathematically correct training
+    
     Args:
         d_model: Model dimension
         num_tiles: Number of specialist tiles
@@ -124,6 +156,7 @@ class SparseLookupFFN(nn.Module):
         compress_hidden: Hidden dimension in compression network
         ternary_splines: Use ternary quantized splines
         dropout: Dropout rate
+        use_gradient_truth: Use Gradient Truth paradigm (default True)
     """
     
     def __init__(
@@ -135,6 +168,7 @@ class SparseLookupFFN(nn.Module):
         compress_hidden: Optional[int] = None,
         ternary_splines: bool = True,
         dropout: float = 0.1,
+        use_gradient_truth: bool = True,
     ):
         super().__init__()
         
@@ -143,8 +177,9 @@ class SparseLookupFFN(nn.Module):
         self.num_clusters = num_tiles // tiles_per_cluster
         self.tiles_per_cluster = tiles_per_cluster
         self.grid_size = grid_size
+        self.use_gradient_truth = use_gradient_truth
         
-        # Compression network (shared across all tiles)
+        # Compression network (shared across all tiles) - always learned
         compress_hidden = compress_hidden or d_model // 4
         self.compress = nn.Sequential(
             nn.Linear(d_model, compress_hidden),
@@ -154,13 +189,27 @@ class SparseLookupFFN(nn.Module):
         )
         
         # Per-tile splines
-        SplineClass = TernarySpline2D if ternary_splines else FloatSpline2D
-        self.splines = nn.ModuleList([
-            SplineClass(grid_size) for _ in range(num_tiles)
-        ])
+        if ternary_splines:
+            self.splines = nn.ModuleList([
+                TernarySpline2D(grid_size, use_gradient_truth=use_gradient_truth)
+                for _ in range(num_tiles)
+            ])
+        else:
+            self.splines = nn.ModuleList([
+                FloatSpline2D(grid_size) for _ in range(num_tiles)
+            ])
         
         # Tile directions (the "knowledge" - what each tile contributes)
-        self.directions = nn.Parameter(torch.randn(num_tiles, d_model) * 0.02)
+        init_directions = torch.randn(num_tiles, d_model) * 0.02
+        if use_gradient_truth:
+            # Gradient Truth: Freeze directions as ternary
+            frozen_directions = torch.sign(init_directions)
+            self.register_buffer('directions', frozen_directions)
+            # Learned magnitude per direction
+            self.direction_scales = nn.Parameter(torch.ones(num_tiles))
+        else:
+            # Legacy mode: learnable directions
+            self.directions = nn.Parameter(init_directions)
         
         # Normalization
         self.norm = nn.LayerNorm(d_model)
@@ -273,8 +322,13 @@ class SparseLookupFFN(nn.Module):
             # Spline lookup
             scale = self.splines[t](a[mask], b[mask])  # [n]
             
-            # Apply direction
-            output[mask] = scale.unsqueeze(-1) * self.directions[t]
+            # Apply direction (ternary) with learned scale
+            if self.use_gradient_truth:
+                # Gradient Truth: frozen direction * learned scale
+                output[mask] = scale.unsqueeze(-1) * self.directions[t] * self.direction_scales[t]
+            else:
+                # Legacy: learnable direction
+                output[mask] = scale.unsqueeze(-1) * self.directions[t]
             
             # Track usage
             if self.training:

@@ -35,12 +35,23 @@ class TestTernarySpline2D:
         assert out.abs().max() < 10 * spline.scale.abs()
     
     def test_gradient_flow(self):
-        """Gradients flow through STE."""
-        spline = TernarySpline2D(grid_size=16)
+        """Gradients flow through scale (Gradient Truth mode)."""
+        spline = TernarySpline2D(grid_size=16)  # Gradient Truth by default
         a = torch.randn(32, requires_grad=True)
         b = torch.randn(32, requires_grad=True)
         out = spline(a, b)
         out.sum().backward()
+        # In Gradient Truth mode, coeffs are frozen, only scale gets gradients
+        assert spline.scale.grad is not None
+    
+    def test_gradient_flow_legacy(self):
+        """Gradients flow through STE (legacy mode)."""
+        spline = TernarySpline2D(grid_size=16, use_gradient_truth=False)
+        a = torch.randn(32, requires_grad=True)
+        b = torch.randn(32, requires_grad=True)
+        out = spline(a, b)
+        out.sum().backward()
+        # In legacy mode, coeffs get gradients via STE
         assert spline.coeffs.grad is not None
         assert spline.scale.grad is not None
     
@@ -114,14 +125,14 @@ class TestSparseLookupFFN:
         assert diff < x.abs().mean() * 2, "Residual should keep output close to input"
     
     def test_gradient_flow(self):
-        """Gradients flow to key parameters."""
+        """Gradients flow to key parameters (Gradient Truth mode)."""
         model = SparseLookupFFN(d_model=64, num_tiles=16, tiles_per_cluster=4)
         x = torch.randn(2, 16, 64)
         out, _, _ = model(x)
         out.sum().backward()
         
-        # Critical params must have gradients
-        assert model.directions.grad is not None
+        # In Gradient Truth mode, directions are frozen, scales are learned
+        assert model.direction_scales.grad is not None
         assert model.compress[0].weight.grad is not None
         assert model.output_scale.grad is not None
     
@@ -213,7 +224,8 @@ class TestSparseLookupBlock:
         
         # Check attention and FFN both get gradients
         assert block.ln1.weight.grad is not None
-        assert block.ffn.directions.grad is not None
+        # In Gradient Truth mode, direction_scales gets gradients, not directions
+        assert block.ffn.direction_scales.grad is not None
 
 
 class TestIntegration:

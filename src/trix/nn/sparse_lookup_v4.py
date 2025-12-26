@@ -1,5 +1,7 @@
 """
-SparseLookupFFNv4: SpatioTemporal TriX
+SparseLookupFFNv4: SpatioTemporal TriX (DEPRECATED)
+
+NOTE: This module is deprecated. Use SparseLookupFFN with use_gradient_truth=True.
 
 Combines three routing dimensions:
 1. SPATIAL (GeometriX): Position on the manifold (B-spline spreading)
@@ -13,6 +15,13 @@ The geometry:
 
 For 6502 ADC: Carry flag creates two parallel tubes. C=0 and C=1 route differently.
 """
+
+import warnings
+warnings.warn(
+    "sparse_lookup_v4 is deprecated. Use SparseLookupFFN with use_gradient_truth=True.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 import torch
 import torch.nn as nn

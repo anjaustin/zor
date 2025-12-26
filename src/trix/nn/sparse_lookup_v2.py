@@ -1,5 +1,7 @@
 """
-SparseLookupFFN v2: With Signature Surgery and Island Regularization
+SparseLookupFFN v2: With Signature Surgery and Island Regularization (DEPRECATED)
+
+NOTE: This module is deprecated. Use SparseLookupFFN with use_gradient_truth=True.
 
 New capabilities:
   1. Signature surgery API (insert, freeze, unfreeze, claim tracking)
@@ -8,6 +10,13 @@ New capabilities:
   
 Based on findings from the Semantic Geometry Thesis experiments.
 """
+
+import warnings
+warnings.warn(
+    "sparse_lookup_v2 is deprecated. Use SparseLookupFFN with use_gradient_truth=True.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 import torch
 import torch.nn as nn
