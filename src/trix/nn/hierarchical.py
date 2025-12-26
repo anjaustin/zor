@@ -25,9 +25,28 @@ import torch.nn.functional as F
 from typing import Tuple, Optional, Dict, List
 import math
 
-from trix.kernel import TriXLinear, STESign
 from trix.nn.xor_superposition import CompressedSignatures, CompressionStats
 from trix.nn.frozen_shapes import ActivationShapes
+
+# Import STESign for backward compatibility (deprecated, use Gradient Truth instead)
+import warnings
+_HAS_STE = False
+STESign = None
+
+def _load_ste():
+    """Lazy load STE to avoid deprecation warning unless actually used."""
+    global _HAS_STE, STESign
+    if STESign is not None:
+        return
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            from trix.kernel import STESign as _STE
+        STESign = _STE
+        _HAS_STE = True
+    except ImportError:
+        _HAS_STE = False
+        STESign = None
 
 
 class TriXTile(nn.Module):
@@ -41,19 +60,57 @@ class TriXTile(nn.Module):
     
     VGem's fixes applied:
     - Learnable output scale (gives gradient a continuous knob)
+    
+    Gradient Truth mode (default):
+    - Weights are frozen after initialization
+    - Only scales are learned (real gradients, no STE)
+    - Mathematically correct training
+    
+    STE mode (legacy):
+    - Weights use Straight-Through Estimator
+    - Gradients flow through quantization (a mathematical lie)
+    - Kept for backward compatibility
     """
     
-    def __init__(self, d_model: int, d_hidden: int, tile_id: int = 0):
+    def __init__(
+        self,
+        d_model: int,
+        d_hidden: int,
+        tile_id: int = 0,
+        use_gradient_truth: bool = True,
+    ):
         super().__init__()
         self.d_model = d_model
         self.d_hidden = d_hidden
         self.tile_id = tile_id
+        self.use_gradient_truth = use_gradient_truth
         
-        # Ternary weights
-        self.up_weight = nn.Parameter(torch.randn(d_hidden, d_model) * 0.02)
-        self.down_weight = nn.Parameter(torch.randn(d_model, d_hidden) * 0.02)
+        if use_gradient_truth:
+            # Gradient Truth: Frozen ternary weights, learned scales
+            # Initialize with random ternary values
+            init_up = torch.randn(d_hidden, d_model)
+            init_down = torch.randn(d_model, d_hidden)
+            
+            # Quantize to ternary and freeze
+            self.register_buffer('up_weight', torch.sign(init_up))
+            self.register_buffer('down_weight', torch.sign(init_down))
+        else:
+            # Legacy STE mode: Learnable weights with STE (deprecated)
+            _load_ste()
+            if not _HAS_STE:
+                raise ImportError(
+                    "STE mode requires trix.kernel. Install or use use_gradient_truth=True"
+                )
+            warnings.warn(
+                "STE mode is deprecated. Use use_gradient_truth=True for mathematically "
+                "correct training. STE will be removed in a future version.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            self.up_weight = nn.Parameter(torch.randn(d_hidden, d_model) * 0.02)
+            self.down_weight = nn.Parameter(torch.randn(d_model, d_hidden) * 0.02)
         
-        # Learnable scales (post-quantization)
+        # Learnable scales (always learned - this is where gradients flow)
         self.up_scale = nn.Parameter(torch.ones(d_hidden))
         self.down_scale = nn.Parameter(torch.ones(d_model))
         
@@ -78,9 +135,14 @@ class TriXTile(nn.Module):
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through this tile."""
-        # Quantize weights (STE)
-        up_w = STESign.apply(self.up_weight)
-        down_w = STESign.apply(self.down_weight)
+        if self.use_gradient_truth:
+            # Gradient Truth: Use frozen ternary weights directly
+            up_w = self.up_weight
+            down_w = self.down_weight
+        else:
+            # Legacy STE mode: Quantize weights with STE
+            up_w = STESign.apply(self.up_weight)
+            down_w = STESign.apply(self.down_weight)
         
         # Up projection
         hidden = F.linear(x, up_w) * self.up_scale
@@ -141,6 +203,7 @@ class HierarchicalTriXFFN(nn.Module):
         ema_decay: EMA decay for signature stability (VGem recommends 0.999)
         use_residual: Whether to add residual connection (VGem's fix)
         freeze_routing: Freeze signatures for "Frozen Routing" test
+        use_gradient_truth: Use Gradient Truth paradigm (default True, no STE)
     """
     
     def __init__(
@@ -157,6 +220,7 @@ class HierarchicalTriXFFN(nn.Module):
         use_residual: bool = True,  # VGem's fix
         freeze_routing: bool = False,  # For "Frozen Routing" test
         routing_mode: str = 'dot',  # 'dot' or 'hamming' - use TriX's own shapes
+        use_gradient_truth: bool = True,  # Gradient Truth: no STE, real gradients
     ):
         super().__init__()
         
@@ -179,13 +243,14 @@ class HierarchicalTriXFFN(nn.Module):
         
         self.use_residual = use_residual
         self.freeze_routing = freeze_routing
+        self.use_gradient_truth = use_gradient_truth
         
         # VGem's fix: Input normalization for stable routing
         self.input_norm = nn.RMSNorm(d_model) if hasattr(nn, 'RMSNorm') else nn.LayerNorm(d_model)
         
         # Create all tiles
         self.tiles = nn.ModuleList([
-            TriXTile(d_model, self.d_hidden, tile_id=i)
+            TriXTile(d_model, self.d_hidden, tile_id=i, use_gradient_truth=use_gradient_truth)
             for i in range(num_tiles)
         ])
         

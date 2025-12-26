@@ -13,8 +13,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple, Optional
 
-from ..kernel import TriXLinear
+import warnings
 from .frozen_shapes import ActivationShapes
+
+# Lazy import to avoid deprecation warning on module load
+_TriXLinear = None
+
+def _load_kernel():
+    """Lazy load kernel components."""
+    global _TriXLinear
+    if _TriXLinear is not None:
+        return
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        from ..kernel import TriXLinear
+    _TriXLinear = TriXLinear
 
 
 class TriXFFN(nn.Module):
@@ -59,8 +72,9 @@ class TriXFFN(nn.Module):
         self.num_tiles = num_tiles
         
         # TriX layers - routing emerges from up_proj signatures
-        self.up_proj = TriXLinear(d_model, self.d_ff, num_tiles)
-        self.down_proj = TriXLinear(self.d_ff, d_model, num_tiles)
+        _load_kernel()
+        self.up_proj = _TriXLinear(d_model, self.d_ff, num_tiles)
+        self.down_proj = _TriXLinear(self.d_ff, d_model, num_tiles)
         self.dropout = nn.Dropout(dropout)
     
     def get_tile_signatures(self) -> torch.Tensor:

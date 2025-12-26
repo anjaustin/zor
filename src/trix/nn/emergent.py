@@ -1,16 +1,34 @@
 """
-Emergent Routing for TriX
+Emergent Routing for TriX (DEPRECATED)
 
 Routing decisions emerge from tile weight structure - no learned gate network.
+
+NOTE: This module uses deprecated STE-based training from trix.kernel.
+Consider using HierarchicalTriXFFN with use_gradient_truth=True instead.
 """
 
+import warnings
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple, List
 
-from ..kernel import TriXLinear, STESign
 from .frozen_shapes import ActivationShapes
+
+# Lazy imports to avoid deprecation warning on module load
+_TriXLinear = None
+_STESign = None
+
+def _load_kernel():
+    """Lazy load kernel components."""
+    global _TriXLinear, _STESign
+    if _TriXLinear is not None:
+        return
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        from ..kernel import TriXLinear, STESign
+    _TriXLinear = TriXLinear
+    _STESign = STESign
 
 
 class EmergentGatedFFN(nn.Module):
@@ -43,9 +61,16 @@ class EmergentGatedFFN(nn.Module):
         self.d_ff = d_model * expansion
         self.num_tiles = num_tiles
         
-        # TriX layers with tiled weights
-        self.up_proj = TriXLinear(d_model, self.d_ff, num_tiles)
-        self.down_proj = TriXLinear(self.d_ff, d_model, num_tiles)
+        # TriX layers with tiled weights (deprecated - use HierarchicalTriXFFN)
+        _load_kernel()
+        warnings.warn(
+            "EmergentGatedFFN uses deprecated TriXLinear. Consider using "
+            "HierarchicalTriXFFN with use_gradient_truth=True instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        self.up_proj = _TriXLinear(d_model, self.d_ff, num_tiles)
+        self.down_proj = _TriXLinear(self.d_ff, d_model, num_tiles)
         self.dropout = nn.Dropout(dropout)
         
         # No gate_proj - routing emerges from up_proj weights

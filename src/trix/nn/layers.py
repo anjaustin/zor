@@ -2,15 +2,31 @@
 TriX Neural Network Layers
 
 High-level components for building sparse neural networks.
+
+Note: GatedFFN uses the deprecated TriXLinear from trix.kernel.
+Consider using HierarchicalTriXFFN with use_gradient_truth=True instead.
 """
 
+import warnings
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple
 
-from ..kernel import TriXLinear
 from .frozen_shapes import ActivationShapes
+
+# Lazy import of TriXLinear to avoid deprecation warning on module load
+_TriXLinear = None
+
+def _get_trix_linear():
+    """Lazy load TriXLinear with deprecation warning."""
+    global _TriXLinear
+    if _TriXLinear is None:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            from ..kernel import TriXLinear
+        _TriXLinear = TriXLinear
+    return _TriXLinear
 
 
 class Top1Gate(torch.autograd.Function):
@@ -61,6 +77,13 @@ class GatedFFN(nn.Module):
         self.num_tiles = num_tiles
         self.noise_scale = noise_scale
         
+        TriXLinear = _get_trix_linear()
+        warnings.warn(
+            "GatedFFN uses deprecated TriXLinear. Consider using "
+            "HierarchicalTriXFFN with use_gradient_truth=True instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self.up_proj = TriXLinear(d_model, self.d_ff, num_tiles)
         self.down_proj = TriXLinear(self.d_ff, d_model, num_tiles)
         self.gate_proj = nn.Linear(d_model, num_tiles)

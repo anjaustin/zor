@@ -17,8 +17,23 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple, Optional, Dict
 
-from trix.kernel import TriXLinear, STESign
+import warnings
 from trix.nn.frozen_shapes import ActivationShapes
+
+# Lazy imports to avoid deprecation warning on module load
+_TriXLinear = None
+_STESign = None
+
+def _load_kernel():
+    """Lazy load kernel components."""
+    global _TriXLinear, _STESign
+    if _TriXLinear is not None:
+        return
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        from trix.kernel import TriXLinear, STESign
+    _TriXLinear = TriXLinear
+    _STESign = STESign
 
 
 class SparseTriXFFN(nn.Module):
@@ -63,9 +78,10 @@ class SparseTriXFFN(nn.Module):
         # Tile size for gated computation
         self.tile_size = self.d_ff // num_tiles
         
-        # Core layers
-        self.up_proj = TriXLinear(d_model, self.d_ff, num_tiles)
-        self.down_proj = TriXLinear(self.d_ff, d_model, num_tiles)
+        # Core layers (deprecated - use HierarchicalTriXFFN)
+        _load_kernel()
+        self.up_proj = _TriXLinear(d_model, self.d_ff, num_tiles)
+        self.down_proj = _TriXLinear(self.d_ff, d_model, num_tiles)
         self.dropout = nn.Dropout(dropout)
         
         # EMA signatures for stable routing
@@ -146,9 +162,9 @@ class SparseTriXFFN(nn.Module):
         batch = x.shape[0]
         device = x.device
         
-        # Quantize weights (STE)
-        up_w = STESign.apply(self.up_proj.weight)
-        down_w = STESign.apply(self.down_proj.weight)
+        # Quantize weights (STE - deprecated)
+        up_w = _STESign.apply(self.up_proj.weight)
+        down_w = _STESign.apply(self.down_proj.weight)
         
         # Output accumulator
         out = torch.zeros(batch, self.d_model, device=device)
@@ -234,7 +250,9 @@ class SparseTriXFFN(nn.Module):
         
         Requires pack() to be called first.
         """
-        from trix.kernel import trix_forward
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            from trix.kernel import trix_forward
         
         # Up projection with NEON
         hidden = trix_forward(

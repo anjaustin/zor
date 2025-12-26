@@ -44,6 +44,20 @@ class TestTriXTile:
         out = tile(x)
         loss = out.sum()
         loss.backward()
+        # In Gradient Truth mode (default), weights are frozen
+        # Gradients flow through scales instead
+        assert tile.up_scale.grad is not None
+        assert tile.down_scale.grad is not None
+        assert tile.output_scale.grad is not None
+    
+    def test_gradient_flow_ste_mode(self):
+        """Gradients flow through tile in legacy STE mode."""
+        tile = TriXTile(d_model=64, d_hidden=32, use_gradient_truth=False)
+        x = torch.randn(8, 64)
+        out = tile(x)
+        loss = out.sum()
+        loss.backward()
+        # In STE mode, weights get gradients (the lie)
         assert tile.up_weight.grad is not None
         assert tile.down_weight.grad is not None
     
@@ -123,9 +137,9 @@ class TestHierarchicalTriXFFN:
         out, routing, aux = ffn(x)
         loss = out.sum() + aux.get('total_aux', 0)
         loss.backward()
-        # At least some tiles should have gradients
-        grads = [tile.up_weight.grad is not None for tile in ffn.tiles]
-        assert any(grads)
+        # In Gradient Truth mode (default), gradients flow through scales
+        scale_grads = [tile.up_scale.grad is not None for tile in ffn.tiles]
+        assert any(scale_grads)
     
     def test_hierarchy_built(self):
         """Hierarchy is built automatically."""
@@ -264,8 +278,9 @@ class TestHierarchicalBlock:
         out, routing, aux = block(x)
         loss = out.sum()
         loss.backward()
-        assert block.ffn.tiles[0].up_weight.grad is not None or \
-               any(t.up_weight.grad is not None for t in block.ffn.tiles)
+        # In Gradient Truth mode (default), gradients flow through scales
+        assert block.ffn.tiles[0].up_scale.grad is not None or \
+               any(t.up_scale.grad is not None for t in block.ffn.tiles)
 
 
 class TestEMASignatures:
