@@ -185,11 +185,15 @@ class SparseLookupFFN(nn.Module):
 
 ---
 
-### SparseLookupFFNv2
+### SparseLookupFFNv2 (DEPRECATED)
+
+> **Deprecated**: Use `SparseLookupFFN` with `use_gradient_truth=True` instead.
+> This module uses STE-based training which is no longer recommended.
 
 Enhanced with surgery API and regularization.
 
 ```python
+# DEPRECATED - do not use for new code
 class SparseLookupFFNv2(nn.Module):
     def __init__(
         self,
@@ -197,27 +201,22 @@ class SparseLookupFFNv2(nn.Module):
         num_tiles: int = 64,
         spline_knots: int = 8,
         dropout: float = 0.1,
-        island_weight: float = 0.01,  # Signature diversity loss
-        ternary_weight: float = 0.01, # Ternarization loss
+        island_weight: float = 0.01,
+        ternary_weight: float = 0.01,
     ):
-        """
-        Additional Args:
-            island_weight: Weight for island regularization
-            ternary_weight: Weight for ternary convergence
-        """
+        ...
 ```
 
-**Surgery API:**
+**Migration:**
 
 ```python
-def surgery_replace_tile(self, tile_idx: int, new_signature: Tensor):
-    """Replace a tile's signature."""
+# Old (deprecated):
+from trix.nn import SparseLookupFFNv2
+ffn = SparseLookupFFNv2(d_model=512, num_tiles=64)
 
-def surgery_merge_tiles(self, tile_a: int, tile_b: int):
-    """Merge two tiles into one."""
-
-def surgery_split_tile(self, tile_idx: int):
-    """Split a tile into two."""
+# New (recommended):
+from trix import SparseLookupFFN
+ffn = SparseLookupFFN(d_model=512, num_tiles=64)  # use_gradient_truth=True by default
 ```
 
 ---
@@ -906,11 +905,15 @@ def forward(self, x: Tensor, state: Tensor) -> Tuple[Tensor, Tensor]:
 
 ---
 
-## Kernel Operations
+## Kernel Operations (DEPRECATED)
+
+> **Deprecated**: The `trix.kernel` module is deprecated.
+> Use `trix.native.ops` for inference and `trix.nn` with `use_gradient_truth=True` for training.
+> STE-based operations like `STESign` are no longer recommended.
 
 ### TriXLinear
 
-Base ternary linear layer.
+Base ternary linear layer (legacy, uses STE).
 
 ```python
 class TriXLinear(nn.Module):

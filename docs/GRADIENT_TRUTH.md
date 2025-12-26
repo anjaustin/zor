@@ -143,9 +143,52 @@ shapes.freeze()  # Never use STE again
 
 ---
 
+## Three Implementations
+
+Gradient Truth has three complementary implementations:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      GRADIENT TRUTH: THREE PATHS                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  PATH A: Shape Banks              PATH B: Ternary MatMul                    │
+│  ────────────────────             ─────────────────────                     │
+│  GradientTruthFFN                 HierarchicalTriXFFN                       │
+│                                                                             │
+│  Route → ShapeBank → Execute      Route → Tile → y = W @ x                  │
+│                                                                             │
+│  FROZEN:                          FROZEN:                                   │
+│    • Polynomial shapes              • Ternary weights (buffers)             │
+│    • XOR/AND primitives                                                     │
+│                                   LEARNED:                                  │
+│  LEARNED:                           • up_scale, down_scale                  │
+│    • Routing attention              • output_scale                          │
+│    • Magnitude scales                                                       │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  PATH C: MatMul-Free                                                        │
+│  ───────────────────                                                        │
+│  SparseLookupFFN                                                            │
+│                                                                             │
+│  Route → Direction → Spline                                                 │
+│                                                                             │
+│  FROZEN:                          LEARNED:                                  │
+│    • Ternary directions             • direction_scales                      │
+│    • Ternary spline coefficients    • spline scales                         │
+│                                     • compression network                   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Usage
 
-### Basic FFN
+### Path A: Shape Banks (GradientTruthFFN)
+
+The original Gradient Truth implementation with polynomial shape primitives:
 
 ```python
 from trix.nn import GradientTruthFFN, PolynomialShapeBank
@@ -162,29 +205,63 @@ loss = criterion(output, target)
 loss.backward()  # Gradients are mathematically correct!
 ```
 
-### Transformer Block
+### Path B: Ternary MatMul (HierarchicalTriXFFN)
 
 ```python
-from trix.nn import GradientTruthBlock, PolynomialShapeBank
+from trix import HierarchicalTriXFFN
 
-shapes = PolynomialShapeBank.from_primitives(d_model=512, num_shapes=16)
-block = GradientTruthBlock(
+# Gradient Truth is default (use_gradient_truth=True)
+ffn = HierarchicalTriXFFN(
     d_model=512,
-    n_heads=8,
-    shape_bank=shapes,
+    num_tiles=64,
+    tiles_per_cluster=8,
 )
 
-output, routing_info = block(x)
+# Train with standard optimizer
+output, routing_info, aux_losses = ffn(x)
+loss = criterion(output, target) + aux_losses['total_aux']
+loss.backward()  # Gradients are mathematically correct!
+
+# What's frozen vs learned:
+# - ffn.tiles[i].up_weight   → frozen ternary (buffer)
+# - ffn.tiles[i].down_weight → frozen ternary (buffer)
+# - ffn.tiles[i].up_scale    → learned (parameter)
+# - ffn.tiles[i].down_scale  → learned (parameter)
 ```
 
-### Convenience Functions
+### Path C: MatMul-Free (SparseLookupFFN)
 
 ```python
-from trix.nn import create_gradient_truth_ffn, create_gradient_truth_block
+from trix import SparseLookupFFN
 
-# Quick setup with polynomial shapes
-ffn = create_gradient_truth_ffn(d_model=512, num_shapes=16)
-block = create_gradient_truth_block(d_model=512, n_heads=8, num_shapes=16)
+# Gradient Truth is default (use_gradient_truth=True)
+ffn = SparseLookupFFN(
+    d_model=512,
+    num_tiles=64,
+    tiles_per_cluster=8,
+    grid_size=16,  # Spline resolution
+)
+
+output, routing_info, aux_losses = ffn(x)
+loss = criterion(output, target) + aux_losses['total_aux']
+loss.backward()
+
+# What's frozen vs learned:
+# - ffn.directions           → frozen ternary (buffer)
+# - ffn.direction_scales     → learned (parameter)
+# - ffn.splines[i].coeffs    → frozen ternary (buffer)
+# - ffn.splines[i].scale     → learned (parameter)
+# - ffn.compress             → learned (always)
+```
+
+### Legacy STE Mode (Deprecated)
+
+For backward compatibility, STE mode is still available:
+
+```python
+# Not recommended - use only for comparison experiments
+ffn = HierarchicalTriXFFN(d_model=512, num_tiles=64, use_gradient_truth=False)
+ffn = SparseLookupFFN(d_model=512, num_tiles=64, use_gradient_truth=False)
 ```
 
 ---

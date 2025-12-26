@@ -257,33 +257,42 @@ for t in range(10):
 
 ---
 
-## Tutorial 6: Compiled Dispatch
+## Tutorial 6: Production Inference
 
-### For Production Inference
+### Gradient Truth Mode (Default)
+
+Both `HierarchicalTriXFFN` and `SparseLookupFFN` now use Gradient Truth by default:
+
+```python
+from trix import HierarchicalTriXFFN, SparseLookupFFN
+
+# Path A: Ternary MatMul - frozen weights, learned scales
+ffn_a = HierarchicalTriXFFN(d_model=128, num_tiles=32)
+
+# Path B: MatMul-Free - frozen directions, learned scales  
+ffn_b = SparseLookupFFN(d_model=128, num_tiles=32)
+
+# Both train the same way
+x = torch.randn(2, 16, 128)
+output, routing_info, aux = ffn_a(x)
+loss = output.sum() + aux['total_aux']
+loss.backward()
+
+# Weights are already ternary (buffers) - no quantization needed for inference
+print(f"Ternary weights: {ffn_a.tiles[0].up_weight.unique()}")  # tensor([-1., 1.])
+```
+
+### Compiled Dispatch (Legacy)
+
+> **Note**: CompiledDispatch uses deprecated `SparseLookupFFNv2`.
+> For new projects, use `SparseLookupFFN` with Gradient Truth.
 
 ```python
 from trix.nn import SparseLookupFFNv2, CompiledDispatch
 
-# Train a model (simplified)
+# Legacy approach (deprecated)
 ffn = SparseLookupFFNv2(d_model=128, num_tiles=32)
-
-# Wrap with compiled dispatch
 compiled = CompiledDispatch(ffn)
-
-# Profile routing for known classes
-for class_id in range(10):
-    samples = torch.randn(100, 128)  # Representative samples
-    stats = compiled.profile_class(class_id, samples)
-    print(f"Class {class_id}: dominant_tile={stats.dominant_tile}, "
-          f"stability={stats.stability:.2f}")
-
-# Compile stable routes
-n_compiled = compiled.compile_stable(threshold=0.9)
-print(f"Compiled {n_compiled} classes")
-
-# Inference with hints
-x = torch.randn(1, 32, 128)
-output, _, _ = compiled(x, class_hint=5, confidence=0.95)
 ```
 
 ---
