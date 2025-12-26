@@ -143,13 +143,13 @@ shapes.freeze()  # Never use STE again
 
 ---
 
-## Three Implementations
+## Four Implementations
 
-Gradient Truth has three complementary implementations:
+Gradient Truth has four complementary implementations:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                      GRADIENT TRUTH: THREE PATHS                            │
+│                      GRADIENT TRUTH: FOUR PATHS                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  PATH A: Shape Banks              PATH B: Ternary MatMul                    │
@@ -168,19 +168,28 @@ Gradient Truth has three complementary implementations:
 │                                                                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  PATH C: MatMul-Free                                                        │
-│  ───────────────────                                                        │
-│  SparseLookupFFN                                                            │
+│  PATH C: MatMul-Free              PATH D: Multi-Resolution                  │
+│  ───────────────────              ────────────────────────                  │
+│  SparseLookupFFN                  TrueOctaveFFN                             │
 │                                                                             │
-│  Route → Direction → Spline                                                 │
+│  Route → Direction → Spline       Route → Octaves → Blend                   │
 │                                                                             │
-│  FROZEN:                          LEARNED:                                  │
-│    • Ternary directions             • direction_scales                      │
-│    • Ternary spline coefficients    • spline scales                         │
-│                                     • compression network                   │
+│  FROZEN:                          FROZEN:                                   │
+│    • Ternary directions             • Fine octave (random init)             │
+│    • Ternary spline coeffs          • Medium/Coarse (derived)               │
+│                                                                             │
+│  LEARNED:                         LEARNED:                                  │
+│    • direction_scales               • Tile scales                           │
+│    • spline scales                  • Blend network                         │
+│    • compression network                                                    │
+│                                   MODES:                                    │
+│                                     • Generative (soft)                     │
+│                                     • Deterministic (hard)                  │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+See [TRUE_OCTAVE.md](TRUE_OCTAVE.md) for the full multi-resolution architecture.
 
 ---
 
@@ -252,6 +261,36 @@ loss.backward()
 # - ffn.splines[i].coeffs    → frozen ternary (buffer)
 # - ffn.splines[i].scale     → learned (parameter)
 # - ffn.compress             → learned (always)
+```
+
+### Path D: Multi-Resolution (TrueOctaveFFN)
+
+```python
+from trix import TrueOctaveFFN
+
+# Derived octaves: coarse = sign(pool(fine))
+ffn = TrueOctaveFFN(
+    d_model=512,
+    num_fine_tiles=64,
+    pool_factor=4,  # 64 → 16 → 4 tiles
+)
+
+# Generative mode (LLM-like): soft routing, soft blend
+ffn.set_mode("generative")
+output, info = ffn(x)
+# info.entropy > 0 (uncertainty exists)
+
+# Deterministic mode (6502-like): hard routing, hard blend
+ffn.set_mode("deterministic")
+output, info = ffn(x)
+# info.entropy == 0 (exact computation)
+
+# What's frozen vs learned:
+# - ffn.fine.tiles[i].up_weight   → frozen ternary (random init)
+# - ffn.medium.tiles[j]           → frozen ternary (derived from fine)
+# - ffn.coarse.tiles[k]           → frozen ternary (derived from medium)
+# - ffn.*.tiles[*].scale          → learned (parameter)
+# - ffn.blend_net                 → learned (parameter)
 ```
 
 ### Legacy STE Mode (Deprecated)

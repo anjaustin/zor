@@ -304,6 +304,8 @@ make test  # 177 tests total
 |----------|-------------|
 | [THE_WAY.md](docs/THE_WAY.md) | Philosophy: Shape IS Compute |
 | [GRADIENT_TRUTH.md](docs/GRADIENT_TRUTH.md) | No STE. Real gradients. |
+| [TRUE_OCTAVE.md](docs/TRUE_OCTAVE.md) | Multi-resolution: exact + fuzzy |
+| [LINCOLN_MANIFOLD_METHOD.md](docs/LINCOLN_MANIFOLD_METHOD.md) | How we think |
 | [EXECUTION_STACK.md](docs/EXECUTION_STACK.md) | HSOS → GILLIES → Vulkan |
 | [THEORY.md](docs/THEORY.md) | Mathematical foundations |
 
