@@ -2,6 +2,7 @@
 DB Cooper: OctaveIndex - Hierarchical ternary index.
 
 Coarse buckets for fast filtering, fine signatures for precise ranking.
+NEON-accelerated when native ops are available.
 """
 
 import numpy as np
@@ -15,6 +16,13 @@ from .core import (
     pack_ternary,
     explain_match,
 )
+
+# Try to import native ops
+try:
+    from .ops import CooperOps, native_ops_available
+    _NATIVE_OPS = CooperOps() if native_ops_available() else None
+except Exception:
+    _NATIVE_OPS = None
 
 
 @dataclass
