@@ -100,6 +100,15 @@ from .nn import (
 )
 
 # =============================================================================
+# MULTISCALE: Exact where exact, fuzzy where fuzzy
+# =============================================================================
+
+from .nn import (
+    MultiScaleTriXFFN,      # Multi-octave FFN: fine/medium/coarse
+    MultiScaleTriXBlock,    # Full transformer block with multi-scale
+)
+
+# =============================================================================
 # SIMPLE: Sparse Training (Option B) - 4 tiles, proven
 # =============================================================================
 
@@ -258,6 +267,10 @@ __all__ = [
     "SparseLookupFFN",
     "SparseLookupBlock",
     "TernarySpline2D",
+    
+    # MultiScale - Exact where exact, fuzzy where fuzzy
+    "MultiScaleTriXFFN",
+    "MultiScaleTriXBlock",
     
     # Simple - Sparse Training
     "SparseTriXFFN",

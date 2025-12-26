@@ -40,6 +40,14 @@ from .hierarchical import (
     HierarchicalTriXBlock,
 )
 
+from .multiscale import (
+    MultiScaleTriXFFN,
+    MultiScaleTriXBlock,
+    Octave,
+    OctaveTile,
+    MultiScaleRoutingInfo,
+)
+
 from .sparse_lookup import (
     SparseLookupFFN,
     SparseLookupBlock,
@@ -231,6 +239,12 @@ __all__ = [
     "TriXTile",
     "HierarchicalTriXFFN",
     "HierarchicalTriXBlock",
+    # MultiScale (Exact where exact, fuzzy where fuzzy)
+    "MultiScaleTriXFFN",
+    "MultiScaleTriXBlock",
+    "Octave",
+    "OctaveTile",
+    "MultiScaleRoutingInfo",
     # SparseLookup (Routing IS Computation)
     "SparseLookupFFN",
     "SparseLookupBlock",
