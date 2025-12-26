@@ -395,12 +395,34 @@ See `docs/lincoln/gradient_truth/` for the full exploration artifacts.
 
 ---
 
+## Testing
+
+Each Gradient Truth architecture has comprehensive tests:
+
+| Path | Test File | Tests |
+|------|-----------|-------|
+| HierarchicalTriXFFN | `tests/test_hierarchical.py` | 32 |
+| SparseLookupFFN | `tests/test_sparse_lookup.py` | 24 |
+| TrueOctaveFFN | `tests/test_octave.py` | 31 |
+| TrueOctaveFFN (rigorous) | `tests/test_octave_rigorous.py` | 45 |
+
+Run all Gradient Truth tests:
+
+```bash
+PYTHONPATH=src pytest tests/test_hierarchical.py tests/test_sparse_lookup.py tests/test_octave*.py -v
+```
+
+See [TESTING.md](TESTING.md) for the complete testing guide.
+
+---
+
 ## References
 
 - [THE_WAY.md](THE_WAY.md) - The unified philosophy
 - [THEORY.md](THEORY.md) - Mathematical foundations
+- [TRUE_OCTAVE.md](TRUE_OCTAVE.md) - Multi-resolution architecture
+- [TESTING.md](TESTING.md) - Complete testing guide
 - [FROZEN_SHAPES.md](FROZEN_SHAPES.md) - Computation as geometry
-- [MESA15_NG6502_VISION.md](MESA15_NG6502_VISION.md) - Learning IS Routing
 - [LINCOLN_MANIFOLD_METHOD.md](LINCOLN_MANIFOLD_METHOD.md) - The discovery process
 
 ---

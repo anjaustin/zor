@@ -285,16 +285,53 @@ TriX computes itself. The only external dependencies are:
 
 ## Testing
 
-```bash
-# C tests (30 tests)
-cd src/trix/native/ops && make test
+### Quick Start
 
-# Python tests (147 tests)  
+```bash
+# Run all Python tests
 PYTHONPATH=src pytest tests/ -v
 
-# All tests
-make test  # 177 tests total
+# Run C tests
+cd src/trix/native/ops && make test
+
+# Run all tests
+make test
 ```
+
+### Test Categories
+
+| Test File | Tests | What It Verifies |
+|-----------|-------|------------------|
+| `test_octave.py` | 31 | TrueOctaveFFN basic functionality |
+| `test_octave_rigorous.py` | 45 | Mathematical invariants, edge cases |
+| `test_multiscale.py` | 21 | MultiScaleTriXFFN (scaffold) |
+| `test_hierarchical.py` | 32 | HierarchicalTriXFFN with Gradient Truth |
+| `test_sparse_lookup.py` | 24 | SparseLookupFFN MatMul-free path |
+
+### Rigorous Test Suite
+
+The `test_octave_rigorous.py` suite verifies 10 categories of invariants:
+
+```
+1. Derivation Invariants     coarse = sign(pool(fine))
+2. Ternary Invariants        all weights ∈ {-1, 0, +1}
+3. Frozen Invariants         structure unchanged by training
+4. Mode Invariants           deterministic=exact, generative=soft
+5. Gradient Invariants       flow only to learned parameters
+6. Numerical Stability       no NaN, no Inf, bounded outputs
+7. Edge Cases                batch=1, seq=1, zeros, large inputs
+8. Reproducibility           same seed → same output
+9. Training Correctness      loss decreases, params update
+10. Block Integration        stacking, gradient flow
+```
+
+Run the rigorous tests:
+
+```bash
+PYTHONPATH=src pytest tests/test_octave_rigorous.py -v
+```
+
+See [TESTING.md](docs/TESTING.md) for detailed documentation.
 
 ---
 
@@ -305,6 +342,7 @@ make test  # 177 tests total
 | [THE_WAY.md](docs/THE_WAY.md) | Philosophy: Shape IS Compute |
 | [GRADIENT_TRUTH.md](docs/GRADIENT_TRUTH.md) | No STE. Real gradients. |
 | [TRUE_OCTAVE.md](docs/TRUE_OCTAVE.md) | Multi-resolution: exact + fuzzy |
+| [TESTING.md](docs/TESTING.md) | Test suite guide |
 | [LINCOLN_MANIFOLD_METHOD.md](docs/LINCOLN_MANIFOLD_METHOD.md) | How we think |
 | [EXECUTION_STACK.md](docs/EXECUTION_STACK.md) | HSOS → GILLIES → Vulkan |
 | [THEORY.md](docs/THEORY.md) | Mathematical foundations |

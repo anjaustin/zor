@@ -362,10 +362,52 @@ class TrueOctaveBlock(nn.Module):
 
 ---
 
+## Testing
+
+The TrueOctaveFFN architecture is verified by 76 tests across two files:
+
+### Basic Tests (`tests/test_octave.py`)
+
+31 tests covering functionality, integration, and conceptual properties.
+
+```bash
+PYTHONPATH=src pytest tests/test_octave.py -v
+```
+
+### Rigorous Invariant Tests (`tests/test_octave_rigorous.py`)
+
+45 tests across 10 categories of mathematical invariants:
+
+| Category | Tests | What It Verifies |
+|----------|-------|------------------|
+| Derivation | 4 | coarse = sign(pool(fine)) |
+| Ternary | 4 | weights ∈ {-1, 0, +1} |
+| Frozen | 3 | structure unchanged by training |
+| Mode | 6 | deterministic=exact, generative=soft |
+| Gradient | 4 | flow only to learned params |
+| Stability | 6 | no NaN, no Inf, bounded |
+| Edge Cases | 8 | batch=1, zeros, large inputs |
+| Reproducibility | 3 | same seed → same output |
+| Training | 3 | loss decreases, params update |
+| Integration | 4 | stacking, gradient flow |
+
+```bash
+# Run all rigorous tests
+PYTHONPATH=src pytest tests/test_octave_rigorous.py -v
+
+# Run specific category
+PYTHONPATH=src pytest tests/test_octave_rigorous.py::TestDerivationInvariants -v
+```
+
+See [TESTING.md](TESTING.md) for the complete testing guide.
+
+---
+
 ## References
 
 - [LINCOLN_MANIFOLD_METHOD.md](LINCOLN_MANIFOLD_METHOD.md) — The discovery process
 - [GRADIENT_TRUTH.md](GRADIENT_TRUTH.md) — Frozen structure, learned navigation
+- [TESTING.md](TESTING.md) — Complete testing guide
 - [docs/lincoln/octave/](lincoln/octave/) — The manifold exploration artifacts
 - [SPARSE_OCTAVE.md](../trixc/docs/SPARSE_OCTAVE.md) — Original Octave concept (Providence)
 
