@@ -27,6 +27,7 @@ import math
 
 from trix.kernel import TriXLinear, STESign
 from trix.nn.xor_superposition import CompressedSignatures, CompressionStats
+from trix.nn.frozen_shapes import ActivationShapes
 
 
 class TriXTile(nn.Module):
@@ -83,7 +84,7 @@ class TriXTile(nn.Module):
         
         # Up projection
         hidden = F.linear(x, up_w) * self.up_scale
-        hidden = F.relu(hidden)
+        hidden = ActivationShapes.relu(hidden)
         
         # Down projection
         out = F.linear(hidden, down_w) * self.down_scale
@@ -155,6 +156,7 @@ class HierarchicalTriXFFN(nn.Module):
         ema_decay: float = 0.999,  # VGem: increased from 0.99
         use_residual: bool = True,  # VGem's fix
         freeze_routing: bool = False,  # For "Frozen Routing" test
+        routing_mode: str = 'dot',  # 'dot' or 'hamming' - use TriX's own shapes
     ):
         super().__init__()
         
@@ -167,6 +169,10 @@ class HierarchicalTriXFFN(nn.Module):
         self.balance_weight = balance_weight
         self.diversity_weight = diversity_weight
         self.ema_decay = ema_decay
+        self.routing_mode = routing_mode
+        
+        assert routing_mode in ('dot', 'hamming'), \
+            f"routing_mode must be 'dot' or 'hamming', got '{routing_mode}'"
         
         assert num_tiles % tiles_per_cluster == 0, \
             f"num_tiles ({num_tiles}) must be divisible by tiles_per_cluster ({tiles_per_cluster})"
@@ -214,6 +220,39 @@ class HierarchicalTriXFFN(nn.Module):
                 self.ema_decay * self.ema_tile_signatures +
                 (1 - self.ema_decay) * current
             )
+    
+    def _compute_routing_scores(
+        self,
+        x: torch.Tensor,
+        signatures: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Compute routing scores between input and signatures.
+        
+        Uses dot product or Hamming distance based on routing_mode.
+        For ternary signatures: argmax(dot) == argmin(hamming)
+        
+        Args:
+            x: [batch, d_model] input
+            signatures: [num_sigs, d_model] ternary signatures
+            
+        Returns:
+            [batch, num_sigs] scores (higher = better match)
+        """
+        if self.routing_mode == 'dot':
+            # Standard dot product routing
+            return x @ signatures.T
+        else:
+            # Hamming distance routing (XOR + popcount)
+            # For ternary: dot(a,b) = d_model - 2*hamming(a,b)
+            # So we compute negative Hamming to get equivalent ordering
+            x_tern = torch.sign(x)
+            # Hamming = count of positions where signs differ
+            # For ternary {-1, 0, +1}: differ when not equal
+            diff = (x_tern.unsqueeze(1) != signatures.unsqueeze(0)).float()
+            hamming = diff.sum(dim=-1)  # [batch, num_sigs]
+            # Return negative Hamming so argmax gives best match
+            return -hamming
     
     def build_hierarchy(self):
         """
@@ -348,8 +387,8 @@ class HierarchicalTriXFFN(nn.Module):
         batch = x.shape[0]
         device = x.device
         
-        # Level 1: Cluster routing
-        cluster_scores = x @ self.cluster_signatures.T  # [batch, num_clusters]
+        # Level 1: Cluster routing (dot or hamming based on routing_mode)
+        cluster_scores = self._compute_routing_scores(x, self.cluster_signatures)
         
         if self.top_k_clusters == 1:
             # Hard routing to single cluster
@@ -408,8 +447,8 @@ class HierarchicalTriXFFN(nn.Module):
             # Get signatures for tiles in this cluster
             tile_sigs = all_tile_sigs[tile_indices]  # [tiles_per_cluster, d_model]
             
-            # Route within cluster
-            scores = x_sorted[mask] @ tile_sigs.T  # [cluster_batch, tiles_per_cluster]
+            # Route within cluster (dot or hamming based on routing_mode)
+            scores = self._compute_routing_scores(x_sorted[mask], tile_sigs)
             local_winners = scores.argmax(dim=-1)
             local_scores = scores.max(dim=-1).values
             

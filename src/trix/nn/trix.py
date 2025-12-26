@@ -14,6 +14,7 @@ import torch.nn.functional as F
 from typing import Tuple, Optional
 
 from ..kernel import TriXLinear
+from .frozen_shapes import ActivationShapes
 
 
 class TriXFFN(nn.Module):
@@ -118,7 +119,7 @@ class TriXFFN(nn.Module):
         gate = self.compute_routing(x)
         
         # FFN computation
-        hidden = F.relu(self.up_proj(x, gate))
+        hidden = ActivationShapes.relu(self.up_proj(x, gate))
         hidden = self.dropout(hidden)
         out = self.down_proj(hidden, gate)
         

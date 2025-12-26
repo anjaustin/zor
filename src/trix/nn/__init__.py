@@ -129,6 +129,23 @@ from .providence import (
 )
 
 # =============================================================================
+# GRADIENT TRUTH (Training Beyond STE - Gradients Only Where Uncertain)
+# =============================================================================
+
+from .gradient_truth import (
+    Shape,
+    ShapeBank,
+    PolynomialShapeBank,
+    DistilledShapeBank,
+    GradientTruthFFN,
+    GradientTruthBlock,
+    RoutingInfo,
+    ShapeGenesis,
+    create_gradient_truth_ffn,
+    create_gradient_truth_block,
+)
+
+# =============================================================================
 # KAN (Kolmogorov-Arnold Networks) - Track B
 # =============================================================================
 
@@ -325,4 +342,15 @@ __all__ = [
     "ProvidenceBlock",
     "create_providence_ffn",
     "create_frozen_providence_ffn",
+    # Gradient Truth (Training Beyond STE)
+    "Shape",
+    "ShapeBank",
+    "PolynomialShapeBank",
+    "DistilledShapeBank",
+    "GradientTruthFFN",
+    "GradientTruthBlock",
+    "RoutingInfo",
+    "ShapeGenesis",
+    "create_gradient_truth_ffn",
+    "create_gradient_truth_block",
 ]

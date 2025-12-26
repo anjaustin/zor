@@ -55,3 +55,12 @@ Thumbs.db
 
 # Local exports (generated)
 exports/*.trixc
+
+# Archived experiments
+.misc/
+
+# Large data files
+data/*.npz
+data/*.jsonl
+data/*.zst
+*.log

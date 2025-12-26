@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from typing import Tuple, List
 
 from ..kernel import TriXLinear, STESign
+from .frozen_shapes import ActivationShapes
 
 
 class EmergentGatedFFN(nn.Module):
@@ -125,7 +126,7 @@ class EmergentGatedFFN(nn.Module):
         gate = self.route(x)
         
         # FFN with routing
-        hidden = F.relu(self.up_proj(x, gate))
+        hidden = ActivationShapes.relu(self.up_proj(x, gate))
         hidden = self.dropout(hidden)
         out = self.down_proj(hidden, gate)
         

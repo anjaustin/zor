@@ -183,6 +183,27 @@ The STE provides surrogate gradients:
 
 $$\frac{\partial \mathcal{L}}{\partial w} \approx \frac{\partial \mathcal{L}}{\partial \text{sign}(w)}$$
 
+### Gradient Truth Alternative
+
+The STE gradient is mathematically incorrect (the true gradient of sign is 0 a.e.). **Gradient Truth** offers an alternative by separating concerns:
+
+1. **Structure** (discrete): Discovered via derivation, evolution, or distillation—then frozen
+2. **Routing** (continuous): Learned via standard gradient descent
+3. **Magnitude** (continuous): Learned scale factors
+
+The architecture becomes:
+
+$$y = \sum_i p_i(x; \theta_r) \cdot s_i \cdot f_i(x)$$
+
+where:
+- $f_i$ are frozen shapes (no parameters)
+- $p_i(x; \theta_r)$ is soft routing with learnable parameters $\theta_r$
+- $s_i$ are learnable scale factors
+
+Gradients flow through $\theta_r$ and $s_i$ with full mathematical correctness. No STE required.
+
+See [GRADIENT_TRUTH.md](GRADIENT_TRUTH.md) for implementation details.
+
 ### Gradient Flow Through Routing
 
 For differentiable routing with temperature τ:

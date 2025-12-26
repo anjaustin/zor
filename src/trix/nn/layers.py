@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from typing import Tuple
 
 from ..kernel import TriXLinear
+from .frozen_shapes import ActivationShapes
 
 
 class Top1Gate(torch.autograd.Function):
@@ -94,7 +95,7 @@ class GatedFFN(nn.Module):
         gate = Top1Gate.apply(gate_logits)
         
         # FFN with sparse routing
-        hidden = F.relu(self.up_proj(x, gate))
+        hidden = ActivationShapes.relu(self.up_proj(x, gate))
         hidden = self.dropout(hidden)
         out = self.down_proj(hidden, gate)
         

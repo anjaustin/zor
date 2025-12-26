@@ -18,6 +18,7 @@ import torch.nn.functional as F
 from typing import Tuple, Optional, Dict
 
 from trix.kernel import TriXLinear, STESign
+from trix.nn.frozen_shapes import ActivationShapes
 
 
 class SparseTriXFFN(nn.Module):
@@ -172,7 +173,7 @@ class SparseTriXFFN(nn.Module):
             
             # Up projection for this tile
             hidden = torch.mm(tile_x, tile_up_w.t()) * tile_up_scale
-            hidden = F.relu(hidden)
+            hidden = ActivationShapes.relu(hidden)
             hidden = self.dropout(hidden)
             
             # Down projection - this tile's hidden to full output
@@ -240,7 +241,7 @@ class SparseTriXFFN(nn.Module):
             x, self.up_proj.packed_weight, self.up_proj.scales,
             gate, self.d_ff, self.num_tiles
         )
-        hidden = F.relu(hidden)
+        hidden = ActivationShapes.relu(hidden)
         
         # Down projection with NEON
         out = trix_forward(

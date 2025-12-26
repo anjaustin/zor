@@ -280,6 +280,38 @@ This is the "100/100 or don't ship" guarantee.
 
 ---
 
+## Gradient Truth: Training Beyond STE
+
+When shapes are frozen, how do we train the routing?
+
+The traditional approach uses the **Straight-Through Estimator (STE)** - pretending discrete quantization is continuous during backprop. This works but the gradients are mathematically wrong.
+
+**Gradient Truth** offers an elegant alternative:
+
+```
+WHAT to compute  →  Discrete, frozen (shapes)
+WHICH to use     →  Continuous, learned (routing)  
+HOW MUCH         →  Continuous, learned (scales)
+```
+
+No STE needed. Gradients flow through routing and scales. Shapes stand apart as truth.
+
+```python
+from trix.nn import GradientTruthFFN, PolynomialShapeBank
+
+# Shapes are frozen mathematical truths
+shapes = PolynomialShapeBank.from_primitives(d_model=512, num_shapes=16)
+
+# Only routing and scales are learned
+ffn = GradientTruthFFN(d_model=512, shape_bank=shapes)
+```
+
+**The principle:** Gradients should flow only where there is genuine uncertainty. Structure stands apart as truth.
+
+See [GRADIENT_TRUTH.md](GRADIENT_TRUTH.md) for full documentation.
+
+---
+
 ## The Philosophy
 
 From ANDESNUTZ:

@@ -195,6 +195,70 @@ exporter.export('./output/')
 # Generates: my_alu.h, my_alu.c
 ```
 
+## Native Programmable Tiles
+
+Fully native Guardian interface (no PyTorch):
+
+```python
+from trix.native import (
+    NativeProgrammableTile,
+    NativeProgrammableTileBank,
+    NativeTrainingObserver,
+    AdamOptimizer,
+    mse_loss,
+)
+
+# Create tile bank
+bank = NativeProgrammableTileBank(d_model=64, d_hidden=128, num_tiles=8)
+
+# Read/Write interface
+sig = bank.tiles[0].read_signature()
+bank.tiles[0].write_signature(new_sig, blend=0.1, reason='diversity')
+bank.tiles[0].freeze()  # Lock modifications
+
+# Observer monitors and intervenes
+observer = NativeTrainingObserver(bank)
+obs = observer.step(tile_idx)  # Returns metrics, applies interventions
+```
+
+## Native Ops (C Library)
+
+Self-hosted computation with zero external dependencies:
+
+```python
+from trix.native.ops import TrixOps, relu, xor
+
+ops = TrixOps()
+
+# Frozen shapes (polynomial form)
+y = relu(x)              # max(0, x)
+z = xor(a, b)            # a + b - 2ab
+
+# Reductions via adder tree
+total = ops.sum(x)
+length = ops.norm(x)
+
+# Hamming routing
+binary = ops.binarize(x)
+best = ops.route_hamming(binary, signatures)
+```
+
+See [`ops/README.md`](./ops/README.md) for C API and benchmarks.
+
+### Binary Frozen Shapes
+
+After training, freeze shapes to pure bitwise operations:
+
+```c
+// Training (polynomial, gradients flow)
+shape_xor(a, b)  // a + b - 2ab
+
+// Inference (binary, maximum speed)
+shape_xor_binary(a, b)  // a ^ b
+```
+
+**Performance:** 117 GB/s, 2.8x faster than polynomial, 32x less memory.
+
 ## Performance
 
 | Backend | Throughput | Use Case |
@@ -202,6 +266,8 @@ exporter.export('./output/')
 | HSOS Python | ~3M ops/sec | Development, testing |
 | NumPy (CPU) | ~50M ops/sec | Batch inference |
 | CuPy (GPU) | ~100M ops/sec | Training |
+| Native Ops (C) | ~700M ops/sec | Self-hosted CPU |
+| **Binary Shapes** | **117 GB/s** | **Frozen inference** |
 | GILLIES (C) | ~900M ops/sec | Production CPU |
 | **GILLIES Vulkan** | **~19B ops/sec** | **GPU compute** |
 

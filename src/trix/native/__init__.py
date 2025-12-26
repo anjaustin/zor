@@ -75,6 +75,14 @@ from .sparse_octave import (
     SparseOctaveTrainer,
 )
 
+# Programmable Tiles (native Guardian interface)
+from .programmable_tile import (
+    NativeProgrammableTile,
+    NativeProgrammableTileBank,
+    NativeTrainingObserver,
+    TileModification,
+)
+
 __all__ = [
     # Model
     'NativeHollywoodSquares',
@@ -104,4 +112,10 @@ __all__ = [
 
     # Kernels
     'NATIVE_KERNELS',
+
+    # Programmable Tiles
+    'NativeProgrammableTile',
+    'NativeProgrammableTileBank',
+    'NativeTrainingObserver',
+    'TileModification',
 ]

@@ -28,6 +28,8 @@ import torch.nn.functional as F
 from typing import Tuple, Dict, Optional
 import math
 
+from trix.nn.frozen_shapes import ActivationShapes
+
 
 # =============================================================================
 # CORE XOR OPERATIONS
@@ -320,7 +322,7 @@ class XORRoutingFFN(nn.Module):
             # Soft routing: weighted combination
             all_outputs = []
             for t in range(self.num_tiles):
-                hidden = F.relu(self.tile_up[t](x_norm))
+                hidden = ActivationShapes.relu(self.tile_up[t](x_norm))
                 tile_out = self.tile_down[t](hidden)
                 all_outputs.append(tile_out)
 
@@ -333,7 +335,7 @@ class XORRoutingFFN(nn.Module):
                 if not mask.any():
                     continue
 
-                hidden = F.relu(self.tile_up[t](x_norm[mask]))
+                hidden = ActivationShapes.relu(self.tile_up[t](x_norm[mask]))
                 tile_out = self.tile_down[t](hidden)
                 output[mask] = tile_out
 
@@ -538,7 +540,7 @@ class HierarchicalXORRoutingFFN(nn.Module):
             if not mask.any():
                 continue
 
-            hidden = F.relu(self.tile_up[t](x_norm[mask]))
+            hidden = ActivationShapes.relu(self.tile_up[t](x_norm[mask]))
             tile_out = self.tile_down[t](hidden)
             output[mask] = tile_out
 

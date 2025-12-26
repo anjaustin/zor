@@ -348,6 +348,93 @@ gcc -O3 ripple8.c gillies.c -o ripple8
 
 ---
 
+## Native Guardian Interface
+
+The Guardian (training observer) is fully native - no PyTorch required:
+
+```python
+from trix.native import (
+    NativeProgrammableTile,
+    NativeProgrammableTileBank,
+    NativeTrainingObserver,
+    AdamOptimizer,
+    mse_loss,
+)
+
+# Tiles are addressable, observable, modifiable
+bank = NativeProgrammableTileBank(d_model=64, d_hidden=128, num_tiles=8)
+
+# Read interface
+sig = bank.tiles[0].read_signature()
+up, down = bank.tiles[0].read_weights()
+
+# Write interface (bounded modification)
+bank.tiles[0].write_signature(new_sig, blend=0.1, reason='diversity_push')
+
+# Control interface
+bank.tiles[0].freeze()    # Lock modifications
+bank.tiles[0].unfreeze()  # Allow modifications
+
+# Observer monitors and intervenes
+observer = NativeTrainingObserver(bank)
+obs = observer.step(tile_idx)  # Returns metrics + applies interventions
+```
+
+### Observer Metrics
+
+| Metric | Description |
+|--------|-------------|
+| `diversity` | How different tile signatures are (0-1) |
+| `load_balance` | Std dev of tile usage |
+| `num_unused` | Tiles receiving no traffic |
+
+### Intervention Triggers
+
+| Condition | Action |
+|-----------|--------|
+| `diversity < 0.3` | Push similar signatures apart |
+| `load_max > 0.5` | Redistribute unused tiles |
+| `num_unused > n/4` | Move unused toward popular |
+
+---
+
+## Binary Frozen Shapes
+
+After training, shapes can be frozen to pure binary operations for maximum inference speed:
+
+```c
+// Polynomial (training)          Binary (inference)
+shape_xor(a, b)  // a+b-2ab  →   shape_xor_binary(a, b)  // a ^ b
+shape_and(a, b)  // ab       →   shape_and_binary(a, b)  // a & b
+shape_or(a, b)   // a+b-ab   →   shape_or_binary(a, b)   // a | b
+```
+
+**On binary inputs {0, 1}, these are mathematically identical.**
+
+### Performance
+
+```
+XOR on 1,000,000 elements:
+  Polynomial: 0.009 ms (float32, 4 FLOPs/element)
+  Binary:     0.003 ms (uint8, 0.125 ops/element)
+  
+  Speedup:    2.8x
+  Memory:     32x smaller (1 bit vs 32 bits per element)
+  Throughput: 117 GB/s
+```
+
+### Why So Fast?
+
+| Metric | Polynomial | Binary | Ratio |
+|--------|------------|--------|-------|
+| Ops per element | 4 FLOPs | 0.125 XORs | 32x fewer |
+| Bytes per element | 12 | 0.375 | 32x smaller |
+| Cache fit (1M) | No (12 MB) | Yes (375 KB) | - |
+
+Binary shapes process 8 elements per byte-level instruction. Data fits in L2 cache.
+
+---
+
 ## Files
 
 ```
@@ -361,6 +448,14 @@ src/trix/
 │   └── compile.py                 # HSOS → GILLIES compiler
 │
 └── native/
+    ├── programmable_tile.py       # Native Guardian interface
+    ├── trainer.py                 # Native training loop
+    ├── model.py                   # NativeHollywoodSquares
+    ├── ops/                       # Self-hosted C operations
+    │   ├── trix_ops.h             # API header
+    │   ├── trix_ops.c             # Implementation
+    │   ├── libtrix_ops.so         # Compiled library
+    │   └── __init__.py            # Python bindings
     └── vulkan/                    # GILLIES Vulkan
         ├── gillies_vulkan_shapes.c    # Full pipeline + verification
         ├── gillies_vulkan_bench.c     # Scale benchmark
