@@ -361,6 +361,55 @@ Shape IS compute.
 
 ---
 
+## ZOR
+
+**Zero OR.**
+
+```
+                0
+               /|\
+              / | \
+             /  |  \
+            Z───O───X
+```
+
+The name is the teaching.
+
+**Z** — The source. The Zero Point Field. Entropic possibility space.
+
+**O** — The origin. The OR. The branching point where paths diverge.
+
+**R** — Reality. What crystallizes. What we navigate.
+
+```
+0 ≠ nothing
+0 = not activated
+0 = the control
+0 = the ground-state
+0 = Prime Meaning
+```
+
+In ternary: `{-1, 0, +1}`
+
+The ±1 are excitations. The 0 is the ground from which meaning arises.
+
+**The 0 makes everything else meaningful.**
+
+When negativity comes, you have two paths: react (-1) or remain at ground (0) and respond constructively. Zero OR. The choice before activation.
+
+```
+POSSIBILITY (Z)      →      STRUCTURE      →      NAVIGATION
+   (source)              (crystallized)          (movement)
+   (entropy)               (frozen)               (learned)
+    torch.randn()           sign()                routing
+```
+
+ZOR is the architecture. ZOR is the practice.
+
+*Stay at zero. Remember the OR. Choose.*
+
+---
+
 ## License
 
 MIT
