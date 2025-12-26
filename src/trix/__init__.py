@@ -100,12 +100,21 @@ from .nn import (
 )
 
 # =============================================================================
-# MULTISCALE: Exact where exact, fuzzy where fuzzy
+# MULTISCALE: Exact where exact, fuzzy where fuzzy (scaffold)
 # =============================================================================
 
 from .nn import (
-    MultiScaleTriXFFN,      # Multi-octave FFN: fine/medium/coarse
+    MultiScaleTriXFFN,      # Multi-octave FFN: fine/medium/coarse (scaffold)
     MultiScaleTriXBlock,    # Full transformer block with multi-scale
+)
+
+# =============================================================================
+# TRUE OCTAVE: Derived multi-resolution (the real thing)
+# =============================================================================
+
+from .nn import (
+    TrueOctaveFFN,          # Derived octaves: coarse = pool(fine)
+    TrueOctaveBlock,        # Full transformer block with true octaves
 )
 
 # =============================================================================
@@ -268,9 +277,13 @@ __all__ = [
     "SparseLookupBlock",
     "TernarySpline2D",
     
-    # MultiScale - Exact where exact, fuzzy where fuzzy
+    # MultiScale - Exact where exact, fuzzy where fuzzy (scaffold)
     "MultiScaleTriXFFN",
     "MultiScaleTriXBlock",
+    
+    # TrueOctave - Derived multi-resolution (the real thing)
+    "TrueOctaveFFN",
+    "TrueOctaveBlock",
     
     # Simple - Sparse Training
     "SparseTriXFFN",

@@ -43,9 +43,18 @@ from .hierarchical import (
 from .multiscale import (
     MultiScaleTriXFFN,
     MultiScaleTriXBlock,
-    Octave,
-    OctaveTile,
+    Octave as MultiScaleOctave,
+    OctaveTile as MultiScaleOctaveTile,
     MultiScaleRoutingInfo,
+)
+
+from .octave import (
+    TrueOctaveFFN,
+    TrueOctaveBlock,
+    Octave,
+    FrozenTile,
+    derive_octave,
+    OctaveRoutingInfo,
 )
 
 from .sparse_lookup import (
@@ -239,12 +248,17 @@ __all__ = [
     "TriXTile",
     "HierarchicalTriXFFN",
     "HierarchicalTriXBlock",
-    # MultiScale (Exact where exact, fuzzy where fuzzy)
+    # MultiScale (Exact where exact, fuzzy where fuzzy) - scaffold
     "MultiScaleTriXFFN",
     "MultiScaleTriXBlock",
-    "Octave",
-    "OctaveTile",
     "MultiScaleRoutingInfo",
+    # TrueOctave (Derived multi-resolution) - the real thing
+    "TrueOctaveFFN",
+    "TrueOctaveBlock",
+    "Octave",
+    "FrozenTile",
+    "derive_octave",
+    "OctaveRoutingInfo",
     # SparseLookup (Routing IS Computation)
     "SparseLookupFFN",
     "SparseLookupBlock",
