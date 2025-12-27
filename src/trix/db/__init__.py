@@ -54,6 +54,18 @@ from .codex_keywords import (
     CODON_RINGS,
 )
 
+from .hsquares_index import (
+    HollywoodSquaresIndex,
+    create_hsquares_index,
+)
+
+from .codex_squares import (
+    CodexSquaresIndex,
+    CodexResult,
+    CodexTile,
+    create_codex_squares,
+)
+
 __all__ = [
     "OctaveDB",
     "OctaveIndex",
@@ -79,4 +91,12 @@ __all__ = [
     "GENE_KEYS",
     "PARTNERS",
     "CODON_RINGS",
+    # Hollywood Squares Index
+    "HollywoodSquaresIndex",
+    "create_hsquares_index",
+    # Codex Squares Index
+    "CodexSquaresIndex",
+    "CodexResult",
+    "CodexTile",
+    "create_codex_squares",
 ]
