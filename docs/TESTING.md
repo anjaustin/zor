@@ -9,15 +9,43 @@ Comprehensive documentation of the TriX test suite.
 The test suite verifies that TriX architectures maintain their mathematical properties, handle edge cases correctly, and perform as expected across different modes.
 
 ```
-Total Python Tests: 200+
-Total C Tests:      30+
+Total Validation Tests: 142
+Total Legacy Tests:     200+
+Total C Tests:          30+
 
-Key Test Files:
+Validation Suite (December 2025):
+  tests/test_anchored_validation.py    AnchoredDualModeFFN (15 tests)
+  tests/test_octave_validation.py      TrueOctaveFFN (18 tests)
+  tests/test_integration_validation.py Stacked blocks (23 tests)
+  tests/test_task_validation.py        Real tasks (16 tests)
+  tests/test_rigorous.py               Blind spots (70 tests)
+
+Legacy Tests:
   tests/test_octave.py            TrueOctaveFFN functionality
   tests/test_octave_rigorous.py   Mathematical invariants
   tests/test_multiscale.py        MultiScaleTriXFFN
   tests/test_hierarchical.py      HierarchicalTriXFFN
   tests/test_sparse_lookup.py     SparseLookupFFN
+```
+
+---
+
+## Validation Ladder
+
+The validation tests follow a progression from unit to task-level proving:
+
+```
+Level 4: Benchmark  ←─ TODO: Production-scale benchmarks
+    ↑
+Level 3: Task       ←─ test_task_validation.py (16 tests)
+    ↑                   Language modeling, classification, arithmetic
+Level 2: Integration ←─ test_integration_validation.py (23 tests)
+    ↑                   Stacked blocks, gradient flow, stability
+Level 1: Unit       ←─ test_anchored_validation.py (15 tests)
+    ↑                   test_octave_validation.py (18 tests)
+                        Pattern learning, generalization
+Level 0: Rigorous   ←─ test_rigorous.py (70 tests)
+                        Edge cases, numerical stability, invariants
 ```
 
 ---
@@ -69,9 +97,118 @@ PYTHONPATH=src pytest tests/test_octave_rigorous.py::TestNumericalStability -v
 PYTHONPATH=src pytest tests/ --cov=src/trix --cov-report=term-missing
 ```
 
+### Validation Suite Only
+
+```bash
+# Run all validation tests
+PYTHONPATH=src pytest tests/test_*_validation.py tests/test_rigorous.py -v
+
+# Run specific level
+PYTHONPATH=src pytest tests/test_rigorous.py -v           # Level 0: Rigorous
+PYTHONPATH=src pytest tests/test_anchored_validation.py \
+                      tests/test_octave_validation.py -v   # Level 1: Unit
+PYTHONPATH=src pytest tests/test_integration_validation.py -v  # Level 2: Integration
+PYTHONPATH=src pytest tests/test_task_validation.py -v    # Level 3: Task
+```
+
 ---
 
-## Test Categories
+## Validation Test Suite (December 2025)
+
+### Level 0: Rigorous Foundation Tests
+
+**File:** `tests/test_rigorous.py` (70 tests)
+
+Adversarial tests probing blind spots and edge cases.
+
+| Category | Tests | Purpose |
+|----------|-------|---------|
+| Edge Cases | 6 | Single element, long sequences, minimal config |
+| Numerical Stability | 9 | Zero/small/large inputs, NaN, temperature extremes |
+| Gradient Flow | 5 | Learned params get gradients, frozen don't |
+| Determinism | 4 | Eval mode deterministic, reproducible |
+| Mode Consistency | 4 | Train/eval, generative/deterministic |
+| Memory Safety | 3 | No leaks, cleanup works |
+| Serialization | 4 | State dict round-trip |
+| Adversarial Inputs | 6 | Pathological data patterns |
+| Invariants | 6 | Ternary values, derivation, probabilities |
+| Stress | 6 | Many tiles, deep stacks, rapid switching |
+
+**Blind spots discovered:**
+- Temperature → 0 doesn't guarantee one-hot (ties possible)
+- Mode switching requires eval() for true determinism
+
+---
+
+### Level 1: Unit Validation Tests
+
+**File:** `tests/test_anchored_validation.py` (15 tests)
+
+Validates AnchoredDualModeFFN learns patterns.
+
+| Test Class | Tests | Purpose |
+|------------|-------|---------|
+| TestPatternLearning | 3 | XOR, scaling, anchor-aware |
+| TestGeneralization | 2 | Novel inputs, out-of-distribution |
+| TestRouting | 3 | Anchor diversity, tile utilization, temperature |
+| TestComparison | 2 | vs random, vs linear |
+| TestAblation | 3 | Frozen anchors, learned router, scales |
+| TestSanity | 2 | Forward/backward, shapes |
+
+**File:** `tests/test_octave_validation.py` (18 tests)
+
+Validates TrueOctaveFFN learns patterns.
+
+| Test Class | Tests | Purpose |
+|------------|-------|---------|
+| TestPatternLearning | 3 | XOR, scaling, cluster behavior |
+| TestGeneralization | 2 | Novel inputs, noise robustness |
+| TestHierarchicalStructure | 3 | Derivation, octave selection, blend |
+| TestOctaveSelection | 3 | Fine for detail, coarse for global |
+| TestComparison | 2 | vs random, mode differences |
+| TestAblation | 3 | Blend network, scales, mode |
+| TestSanity | 2 | Forward/backward, shapes |
+
+---
+
+### Level 2: Integration Validation Tests
+
+**File:** `tests/test_integration_validation.py` (23 tests)
+
+Validates stacked blocks work together.
+
+| Test Class | Tests | Purpose |
+|------------|-------|---------|
+| TestGradientFlow | 4 | All layers, attention + FFN |
+| TestRoutingDiversity | 3 | No collapse, different layers different |
+| TestLayerSpecialization | 3 | Early vs late layers |
+| TestSequenceLearning | 3 | Copy task, sequence patterns |
+| TestDepthScaling | 3 | 2, 4, 8 layers |
+| TestArchitectureComparison | 2 | Anchored vs Octave |
+| TestStability | 3 | Long training, no NaN |
+| TestTemperatureAnnealing | 2 | Warm → cold |
+
+---
+
+### Level 3: Task Validation Tests
+
+**File:** `tests/test_task_validation.py` (16 tests)
+
+Validates architectures on real tasks.
+
+| Test Class | Tests | Purpose |
+|------------|-------|---------|
+| TestLanguageModeling | 3 | Bigram patterns, coherent generation |
+| TestSequenceClassification | 2 | Classification, generalization |
+| TestArithmeticTasks | 2 | Modular addition, bracket matching |
+| TestTransformerComparison | 2 | vs standard transformer |
+| TestGeneralization | 2 | Longer sequences, distribution shift |
+| TestEfficiency | 2 | Inference speed, memory scaling |
+| TestSanityChecks | 3 | Output shapes, trainability |
+
+---
+
+## Legacy Test Categories
 
 ### 1. TrueOctaveFFN Tests
 
@@ -547,6 +684,8 @@ PYTHONPATH=src pytest tests/test_foo.py -v -s
 
 ## References
 
+- [ANCHORED_DUAL_MODE.md](ANCHORED_DUAL_MODE.md) — AnchoredDualModeFFN architecture
 - [TRUE_OCTAVE.md](TRUE_OCTAVE.md) — TrueOctaveFFN architecture
 - [GRADIENT_TRUTH.md](GRADIENT_TRUTH.md) — Gradient Truth paradigm
+- [API.md](API.md) — Complete API reference
 - [pytest documentation](https://docs.pytest.org/)

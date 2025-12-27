@@ -212,9 +212,44 @@ The answer: anchor-informed routing. The partition is the constraint.
 
 ---
 
+## Testing
+
+The AnchoredDualModeFFN architecture is verified by comprehensive validation tests:
+
+**Unit Validation:** `tests/test_anchored_validation.py` (15 tests)
+- Pattern learning (XOR, scaling, anchor-aware)
+- Generalization to novel inputs
+- Routing behavior and diversity
+- Comparison to baselines
+
+**Rigorous Foundation:** `tests/test_rigorous.py` (70 tests)
+- Edge cases, numerical stability, invariants
+- Gradient flow, determinism, serialization
+
+**Integration:** `tests/test_integration_validation.py` (23 tests)
+- Stacked AnchoredBlocks work together
+- Gradient flow through deep stacks
+
+**Task-Level:** `tests/test_task_validation.py` (16 tests)
+- Language modeling, classification
+- Comparison to standard transformers
+
+```bash
+# Run anchored validation
+PYTHONPATH=src pytest tests/test_anchored_validation.py -v
+
+# Run all validation tests
+PYTHONPATH=src pytest tests/test_*_validation.py tests/test_rigorous.py -v
+```
+
+See [TESTING.md](TESTING.md) for the complete testing guide.
+
+---
+
 ## See Also
 
 - [GRADIENT_TRUTH.md](GRADIENT_TRUTH.md) - The frozen/learned separation principle
 - [THE_WAY.md](THE_WAY.md) - Neural-geometric equivalence
 - [TRUE_OCTAVE.md](TRUE_OCTAVE.md) - Hierarchical frozen architecture
+- [TESTING.md](TESTING.md) - Comprehensive testing guide
 - [API.md](API.md) - Complete API reference

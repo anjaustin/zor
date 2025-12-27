@@ -364,40 +364,39 @@ class TrueOctaveBlock(nn.Module):
 
 ## Testing
 
-The TrueOctaveFFN architecture is verified by 76 tests across two files:
+The TrueOctaveFFN architecture is verified by comprehensive validation tests:
 
-### Basic Tests (`tests/test_octave.py`)
+### Validation Tests (December 2025)
 
-31 tests covering functionality, integration, and conceptual properties.
+**Unit Validation:** `tests/test_octave_validation.py` (18 tests)
+- Pattern learning (XOR, scaling, cluster behavior)
+- Generalization to novel inputs
+- Hierarchical structure verification
+- Octave selection for detail vs global patterns
 
-```bash
-PYTHONPATH=src pytest tests/test_octave.py -v
-```
+**Rigorous Foundation:** `tests/test_rigorous.py` (70 tests)
+- Edge cases, numerical stability, invariants
+- Gradient flow, determinism, serialization
 
-### Rigorous Invariant Tests (`tests/test_octave_rigorous.py`)
+**Integration:** `tests/test_integration_validation.py` (23 tests)
+- Stacked OctaveBlocks work together
+- Gradient flow through deep stacks
 
-45 tests across 10 categories of mathematical invariants:
-
-| Category | Tests | What It Verifies |
-|----------|-------|------------------|
-| Derivation | 4 | coarse = sign(pool(fine)) |
-| Ternary | 4 | weights ∈ {-1, 0, +1} |
-| Frozen | 3 | structure unchanged by training |
-| Mode | 6 | deterministic=exact, generative=soft |
-| Gradient | 4 | flow only to learned params |
-| Stability | 6 | no NaN, no Inf, bounded |
-| Edge Cases | 8 | batch=1, zeros, large inputs |
-| Reproducibility | 3 | same seed → same output |
-| Training | 3 | loss decreases, params update |
-| Integration | 4 | stacking, gradient flow |
+**Task-Level:** `tests/test_task_validation.py` (16 tests)
+- Language modeling, classification
+- Comparison to standard transformers
 
 ```bash
-# Run all rigorous tests
-PYTHONPATH=src pytest tests/test_octave_rigorous.py -v
+# Run octave validation
+PYTHONPATH=src pytest tests/test_octave_validation.py -v
 
-# Run specific category
-PYTHONPATH=src pytest tests/test_octave_rigorous.py::TestDerivationInvariants -v
+# Run all validation tests
+PYTHONPATH=src pytest tests/test_*_validation.py tests/test_rigorous.py -v
 ```
+
+### Legacy Tests
+
+Also includes 76 legacy tests in `test_octave.py` and `test_octave_rigorous.py`.
 
 See [TESTING.md](TESTING.md) for the complete testing guide.
 
