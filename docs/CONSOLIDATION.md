@@ -124,9 +124,9 @@ src/trix/nn/
 | sparse_lookup_v2.py | 746 | DEPRECATED in code | YES |
 | sparse_lookup_v4.py | 448 | DEPRECATED, no tests | YES |
 | multiscale.py | 378 | Superseded by octave | YES |
-| layers.py (GatedFFN) | ~100 | Points to hierarchical | YES |
+| hierarchical_temporal.py | 558 | Superseded by Providence | YES |
 
-**Total: 2,321 lines (14%) → ARCHIVE**
+**Total: 2,879 lines (17%) → ARCHIVE**
 
 ### TIER 4: RESEARCH BRANCHES (Keep Separate)
 | Module | Lines | Value | Decision |
@@ -220,9 +220,9 @@ trix.nn/
 |----------|---------|-------|---|
 | CORE (Keep) | 10 | 6,931 | 40% |
 | UTILITY (Keep) | 2 | 1,236 | 7% |
-| ARCHIVE | 6 | 2,321 | 14% |
-| RESEARCH | 6 | 2,997 | 17% |
-| Other (__init__, etc) | - | 3,706 | 22% |
+| ARCHIVE | 6 | 2,879 | 17% |
+| RESEARCH | 4 | 1,396 | 8% |
+| Other (__init__, etc) | - | 4,749 | 28% |
 
 **Action Items:**
 1. Archive 6 deprecated modules (2,321 lines)
