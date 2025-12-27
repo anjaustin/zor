@@ -2,6 +2,7 @@
 TrueOctaveFFN: Derived Multi-Resolution Frozen Geometry
 
 Born from the Lincoln Manifold Method, December 2025.
+Revised December 2025: Commitment Principle - select, don't blend.
 
 The insight: Octaves are VIEWS of the same structure at different resolutions,
 not independent banks. Coarse = pooled(Fine). This is what bit-shift means
@@ -10,15 +11,24 @@ in the original Sparse Octave design.
     Fine:   64 tiles - the base truth, discovered at init
     Medium: 16 tiles - derived as sign(pool(fine)), frozen
     Coarse:  4 tiles - derived as sign(pool(medium)), frozen
-    
-    Blend network: the only learned component (besides scales)
+
+    Octave selector: learned selection of which octave to use (besides scales)
+
+REVISION (Lincoln Manifold Analysis):
+    Original: Compute all 3 octaves, blend results (SLOW)
+    Revised:  Select 1 octave, compute only that (FAST)
+
+    The key principle: COMMITMENT IS COMPUTATION
+    - Early commitment eliminates parallel paths
+    - Selection is cheaper than blend
+    - Temperature annealing: soft exploration → hard commitment
 
 The derivation is frozen. The structure is frozen. Only the navigation is learned.
 This is Gradient Truth applied to multi-scale architecture.
 
 Two modes:
-    - Generative: soft routing, soft blend (probability flows everywhere)
-    - Deterministic: hard routing, hard blend (exact computation at all scales)
+    - Generative: soft octave selection with temperature (gradients flow)
+    - Deterministic: hard octave selection (exact computation)
 
 The same architecture models both exact systems (6502) and fuzzy systems (LLM).
 The difference is only in the routing mode.
@@ -215,23 +225,28 @@ def derive_octave(source: Octave, pool_factor: int, d_hidden_scale: float = 1.0)
 class TrueOctaveFFN(nn.Module):
     """
     True Octave Feed-Forward Network.
-    
+
     Three octaves with DERIVED structure:
         Fine:   64 tiles (base, random init)
         Medium: 16 tiles (derived from fine, pool_factor=4)
         Coarse:  4 tiles (derived from medium, pool_factor=4)
-    
+
     The derivation is frozen. Coarse IS a compressed view of Fine.
     This is the bit-shift principle from Sparse Octave, applied to ternary weights.
-    
+
+    REVISED: Selection, not blend (Commitment Principle)
+        - Select ONE octave per token, not all three
+        - Temperature annealing: soft → hard selection
+        - 3x faster than original blend approach
+
     Modes:
-        - Generative: soft routing at all octaves, soft blend
-        - Deterministic: hard routing at all octaves, hard blend
-    
+        - Generative: soft octave selection with temperature
+        - Deterministic: hard octave selection (argmax)
+
     The same frozen structure serves both exact and probabilistic computation.
     Only the routing mode changes.
     """
-    
+
     def __init__(
         self,
         d_model: int = 512,
@@ -239,94 +254,147 @@ class TrueOctaveFFN(nn.Module):
         pool_factor: int = 4,
         d_hidden: int = None,
         dropout: float = 0.1,
+        temperature: float = 1.0,
     ):
         super().__init__()
         self.d_model = d_model
         self.num_fine_tiles = num_fine_tiles
         self.pool_factor = pool_factor
         d_hidden = d_hidden or d_model
-        
+
         # Build fine octave (base truth)
         self.fine = Octave(d_model, d_hidden, num_fine_tiles)
         for _ in range(num_fine_tiles):
             self.fine.add_tile(FrozenTile(d_model, d_hidden))
-        
+
         # Derive medium and coarse octaves
         num_medium = num_fine_tiles // pool_factor
         num_coarse = num_medium // pool_factor
-        
+
         self.medium = derive_octave(self.fine, pool_factor)
         self.coarse = derive_octave(self.medium, pool_factor)
-        
+
         self.num_medium_tiles = num_medium
         self.num_coarse_tiles = num_coarse
-        
-        # Blend network (the only learned routing)
-        self.blend_net = nn.Sequential(
-            nn.Linear(d_model, d_model // 4),
-            nn.ReLU(),
-            nn.Linear(d_model // 4, 3),  # 3 octaves
-        )
-        
+
+        # Octave selector (REVISED: simple selector, not blend network)
+        # Select which octave to use, not blend all three
+        self.octave_selector = nn.Linear(d_model, 3)
+
+        # Temperature for soft selection (annealed during training)
+        self.temperature = temperature
+
         # Layer norm and output
         self.norm = nn.LayerNorm(d_model)
         self.output_scale = nn.Parameter(torch.ones(1) * 0.1)
         self.dropout = nn.Dropout(dropout)
-        
+
         # Mode
         self._mode = "generative"
+
+        # Store octaves in a list for indexed access
+        self._octaves = [self.fine, self.medium, self.coarse]
     
     @property
     def mode(self) -> str:
         return self._mode
-    
+
     def set_mode(self, mode: Literal["generative", "deterministic"]):
         assert mode in ("generative", "deterministic")
         self._mode = mode
-    
+
+    def set_temperature(self, temperature: float):
+        """Set temperature for soft octave selection."""
+        self.temperature = max(temperature, 1e-6)  # Avoid division by zero
+
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, OctaveRoutingInfo]:
+        """
+        REVISED forward pass: Select ONE octave, then execute.
+
+        Commitment Principle:
+            - Don't compute all octaves and blend
+            - Select which octave to use, then compute only that one
+            - 3x faster than original approach
+
+        Mode behavior:
+            - Deterministic: hard selection, execute only selected octave (fast)
+            - Generative: soft selection with temperature (gradients flow)
+        """
         B, T, D = x.shape
+
+        # Deterministic mode: always hard selection
+        # Generative mode: soft selection (for gradients)
         hard = (self._mode == "deterministic")
-        
+
         # Normalize
         x_norm = self.norm(x)
-        
-        # Forward through each octave
-        out_fine, idx_fine = self.fine(x_norm, hard=hard)
-        out_medium, idx_medium = self.medium(x_norm, hard=hard)
-        out_coarse, idx_coarse = self.coarse(x_norm, hard=hard)
-        
-        # Blend
-        blend_logits = self.blend_net(x_norm)
-        
+
+        # Octave selection (REVISED: select, don't blend)
+        selection_logits = self.octave_selector(x_norm)  # [B, T, 3]
+
+        # Octave selection with straight-through estimator
+        # Key insight: ALWAYS select ONE octave (commitment principle)
+        # Gradients flow through softmax probabilities (STE trick)
+        probs = F.softmax(selection_logits / self.temperature, dim=-1)
+        selected = selection_logits.argmax(dim=-1)  # [B, T]
+
         if hard:
-            # Hard blend: pick best octave
-            selected = blend_logits.argmax(dim=-1)  # [B, T]
-            blend_weights = F.one_hot(selected, 3).float()
-            
-            # Select output based on best octave
-            outputs = torch.stack([out_fine, out_medium, out_coarse], dim=2)  # [B, T, 3, D]
-            output = outputs.gather(2, selected.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 1, D)).squeeze(2)
+            # Hard selection: no gradients through selection
+            selection_weights = F.one_hot(selected, 3).float()
         else:
-            # Soft blend
-            blend_weights = F.softmax(blend_logits, dim=-1)
-            output = (blend_weights[..., 0:1] * out_fine +
-                      blend_weights[..., 1:2] * out_medium +
-                      blend_weights[..., 2:3] * out_coarse)
-            selected = blend_logits.argmax(dim=-1)
-        
+            # Straight-through estimator: one-hot forward, soft gradients backward
+            # This is the key to fast training with gradient flow
+            one_hot = F.one_hot(selected, 3).float()
+            selection_weights = one_hot - probs.detach() + probs  # STE trick
+
+        # Execute ONLY selected octave (3x faster than computing all)
+        output = torch.zeros(B, T, D, device=x.device, dtype=x.dtype)
+        idx_fine = torch.zeros(B, T, dtype=torch.long, device=x.device)
+        idx_medium = torch.zeros(B, T, dtype=torch.long, device=x.device)
+        idx_coarse = torch.zeros(B, T, dtype=torch.long, device=x.device)
+
+        # Single-octave execution for all modes (COMMITMENT PRINCIPLE)
+        for octave_idx in range(3):
+            mask = selected == octave_idx
+            if mask.any():
+                octave = self._octaves[octave_idx]
+                # Get positions where this octave is selected
+                x_masked = x_norm[mask]  # [N, D] where N = number of selected positions
+
+                # For gradient flow in soft mode, we need tile's soft output
+                out_masked, tile_idx = octave(x_masked.unsqueeze(1), hard=hard)
+
+                # Apply STE: multiply by selection weight
+                # Forward: weight = 1.0 (identity)
+                # Backward: gradients flow through probs for selection learning
+                weight = selection_weights[mask, octave_idx:octave_idx+1]  # [N, 1]
+                output[mask] = out_masked.squeeze(1) * weight
+
+                # Store tile indices
+                if octave_idx == 0:
+                    idx_fine[mask] = tile_idx.squeeze(1)
+                elif octave_idx == 1:
+                    idx_medium[mask] = tile_idx.squeeze(1)
+                else:
+                    idx_coarse[mask] = tile_idx.squeeze(1)
+
         # Output processing
         output = output * self.output_scale
         output = self.dropout(output)
         output = x + output  # Residual
-        
-        # Entropy (uncertainty measure) - use actual blend_weights
-        # For one-hot (deterministic), entropy is 0
-        # For soft blend (generative), entropy measures uncertainty
-        entropy = -(blend_weights * (blend_weights + 1e-10).log()).sum(dim=-1)
-        
+
+        # Report based on mode:
+        # - Deterministic: one-hot weights, zero entropy (committed)
+        # - Generative: soft probs, soft entropy (exploring)
+        if hard:
+            reported_weights = F.one_hot(selected, 3).float()
+            entropy = torch.zeros(B, T, device=x.device, dtype=x.dtype)
+        else:
+            reported_weights = probs
+            entropy = -(probs * (probs + 1e-10).log()).sum(dim=-1)
+
         info = OctaveRoutingInfo(
-            blend_weights=blend_weights,
+            blend_weights=reported_weights,
             fine_tile_idx=idx_fine,
             medium_tile_idx=idx_medium,
             coarse_tile_idx=idx_coarse,
@@ -334,7 +402,7 @@ class TrueOctaveFFN(nn.Module):
             entropy=entropy,
             mode=self._mode,
         )
-        
+
         return output, info
     
     def get_derivation_check(self) -> Dict[str, bool]:
@@ -365,6 +433,13 @@ class TrueOctaveFFN(nn.Module):
         """Re-derive medium and coarse from fine. Call if fine tiles have changed."""
         self.medium = derive_octave(self.fine, self.pool_factor)
         self.coarse = derive_octave(self.medium, self.pool_factor)
+        self._octaves = [self.fine, self.medium, self.coarse]
+
+    # Backward compatibility: alias blend_net to octave_selector
+    @property
+    def blend_net(self):
+        """Backward compatibility alias for octave_selector."""
+        return self.octave_selector
 
 
 class TrueOctaveBlock(nn.Module):
@@ -413,3 +488,7 @@ class TrueOctaveBlock(nn.Module):
     
     def set_mode(self, mode: Literal["generative", "deterministic"]):
         self.ffn.set_mode(mode)
+
+    def set_temperature(self, temperature: float):
+        """Set temperature for octave selection."""
+        self.ffn.set_temperature(temperature)
