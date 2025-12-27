@@ -101,24 +101,24 @@ PARTNERS = {
     55: 59, 59: 55, 56: 60, 60: 56, 61: 62, 62: 61, 63: 64, 64: 63,
 }
 
-# Codon Rings (21 amino acid families)
+# Codon Rings (21 amino acid families) - All 64 Gene Keys assigned
 CODON_RINGS = {
     "Ring of Fire": [1, 14],
     "Ring of Water": [2, 8],
-    "Ring of Life and Death": [3, 20, 23, 24, 27, 42],
+    "Ring of Life and Death": [3, 20, 23, 24, 27, 42, 43, 50],  # +43, +50
     "Ring of Union": [4, 7, 29],
     "Ring of Light": [5, 9, 11, 26],
-    "Ring of Alchemy": [6, 40, 47, 64],
+    "Ring of Alchemy": [6, 40, 47, 63, 64],  # +63
     "Ring of Purification": [13, 30],
     "Ring of Secrets": [12],
     "Ring of Seeking": [15, 39, 52, 53, 54, 58],
     "Ring of Prosperity": [16, 45],
-    "Ring of Humanity": [10, 17, 21, 25, 38, 51],
+    "Ring of Humanity": [10, 17, 18, 21, 25, 38, 51, 57],  # +18, +57
     "Ring of Illusion": [28, 32],
     "Ring of Trials": [33, 56],
     "Ring of Destiny": [34],
-    "Ring of Miracles": [35],
-    "Ring of Divinity": [37],
+    "Ring of Miracles": [35, 55],  # +55
+    "Ring of Divinity": [22, 36, 37],  # +22, +36
     "Ring of Origin": [41],
     "Ring of No Return": [31, 62],
     "Ring of Matter": [46, 48],
