@@ -1,0 +1,41 @@
+[
+  {
+    "model_name": "Anchored",
+    "model_size": "small",
+    "task": "Language Modeling",
+    "final_loss": 6.610853672027588,
+    "final_perplexity": 743.7362491301277,
+    "train_tokens_per_sec": 6305.9486279597495,
+    "inference_samples_per_sec": 348.4366502786346,
+    "inference_latency_ms": 91.83878898620605,
+    "param_count": 625272,
+    "peak_memory_mb": 7.155670166015625,
+    "convergence_step": 100
+  },
+  {
+    "model_name": "Octave",
+    "model_size": "small",
+    "task": "Language Modeling",
+    "final_loss": 6.8881425857543945,
+    "final_perplexity": 967.284407832284,
+    "train_tokens_per_sec": 2778.536978193494,
+    "inference_samples_per_sec": 104.9784236044172,
+    "inference_latency_ms": 304.8245429992676,
+    "param_count": 606028,
+    "peak_memory_mb": 6.9354400634765625,
+    "convergence_step": 100
+  },
+  {
+    "model_name": "Transformer",
+    "model_size": "small",
+    "task": "Language Modeling",
+    "final_loss": 6.6451616287231445,
+    "final_perplexity": 748.3946844071468,
+    "train_tokens_per_sec": 6044.151300796052,
+    "inference_samples_per_sec": 335.53236665943774,
+    "inference_latency_ms": 95.3708291053772,
+    "param_count": 1115880,
+    "peak_memory_mb": 12.770233154296875,
+    "convergence_step": 100
+  }
+]
