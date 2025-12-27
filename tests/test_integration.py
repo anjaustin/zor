@@ -311,13 +311,13 @@ class TestSmokeIntegration:
         assert model.embed.weight.grad is not None, "No gradient for embed layer"
         assert model.embed.weight.grad.abs().sum() > 0, "Zero gradient for embed layer"
         
-        # Each block's FFN
+        # Each block's FFN (check direction_scales, not directions - directions are frozen in Gradient Truth mode)
         for i, block in enumerate(model.blocks):
-            assert block.ffn.directions.grad is not None, (
-                f"No gradient for block {i} FFN directions"
+            assert block.ffn.direction_scales.grad is not None, (
+                f"No gradient for block {i} FFN direction_scales"
             )
-            assert block.ffn.directions.grad.abs().sum() > 0, (
-                f"Zero gradient for block {i} FFN directions"
+            assert block.ffn.direction_scales.grad.abs().sum() > 0, (
+                f"Zero gradient for block {i} FFN direction_scales"
             )
         
         # Output projection
@@ -374,8 +374,9 @@ class TestSparseLookupFFNSmoke:
         loss = F.mse_loss(output, target) + aux['total_aux'] * 0.01
         loss.backward()
         
-        assert model.directions.grad is not None, "No gradient for directions"
-        assert model.directions.grad.abs().sum() > 0, "Zero gradient for directions"
+        # Check direction_scales (not directions - directions are frozen in Gradient Truth mode)
+        assert model.direction_scales.grad is not None, "No gradient for direction_scales"
+        assert model.direction_scales.grad.abs().sum() > 0, "Zero gradient for direction_scales"
     
     def test_ffn_routing_diversity(self):
         """SparseLookupFFN uses multiple tiles, not just one."""

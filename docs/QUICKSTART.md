@@ -496,6 +496,64 @@ High-performance XOR operations on GPU.
 
 ---
 
+## Tutorial 11: Anchored Dual-Mode FFN
+
+Anchor-informed routing for chips AND modal-models from one substrate.
+
+### Concept
+
+Frozen anchors partition the input space. Learned routing searches within partitions.
+
+```python
+from trix.nn import AnchoredDualModeFFN, get_temperature_schedule
+
+ffn = AnchoredDualModeFFN(
+    d_model=256,
+    num_anchors=16,    # Partition count
+    num_tiles=64,      # Execution variants
+    temperature=1.0,   # Partition sharpness
+)
+
+x = torch.randn(4, 32, 256)
+output, info = ffn(x)
+
+# Inspect routing
+print(f"Anchor probs shape: {info['anchor_probs'].shape}")
+print(f"Selected tiles: {info['tile_idx'].unique().tolist()}")
+```
+
+### Training with Temperature Annealing
+
+```python
+optimizer = torch.optim.Adam(ffn.parameters(), lr=1e-3)
+
+for step in range(1000):
+    # Anneal temperature: warm -> cold
+    temp = get_temperature_schedule(step, 1000, start_temp=2.0, end_temp=0.1)
+    ffn.set_temperature(temp)
+
+    optimizer.zero_grad()
+    output, info = ffn(x)
+    loss = criterion(output, target)
+    loss.backward()
+    optimizer.step()
+
+# Inference uses hard selection automatically
+ffn.eval()
+output, info = ffn(x)
+```
+
+### Two Deployment Modes
+
+| Mode | Use | Behavior |
+|------|-----|----------|
+| **Chips** | `.eval()` | Anchors + tiles only, deterministic |
+| **Modal-models** | `.train()` or `.eval()` | Full routing, constrained search |
+
+See [ANCHORED_DUAL_MODE.md](ANCHORED_DUAL_MODE.md) for the full theory.
+
+---
+
 ## The Unified View
 
 ```
@@ -523,7 +581,9 @@ Train with gradients. Execute with geometry. **This is The Way.**
 
 1. **[THE_WAY.md](THE_WAY.md)** - The unified philosophy
 2. **[Architecture Guide](ARCHITECTURE.md)** - Deep dive into system design
-3. **[XORPU_COMPLETE.md](XORPU_COMPLETE.md)** - Deterministic computation details
-4. **[Theory](THEORY.md)** - Mathematical foundations
-5. **[API Reference](API.md)** - Complete API documentation
-6. **[Benchmarks](BENCHMARKS.md)** - Reproduce our results
+3. **[ANCHORED_DUAL_MODE.md](ANCHORED_DUAL_MODE.md)** - Dual-mode architecture (chips + modal-models)
+4. **[GRADIENT_TRUTH.md](GRADIENT_TRUTH.md)** - Training beyond STE
+5. **[XORPU_COMPLETE.md](XORPU_COMPLETE.md)** - Deterministic computation details
+6. **[Theory](THEORY.md)** - Mathematical foundations
+7. **[API Reference](API.md)** - Complete API documentation
+8. **[Benchmarks](BENCHMARKS.md)** - Reproduce our results

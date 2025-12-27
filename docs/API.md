@@ -221,6 +221,124 @@ ffn = SparseLookupFFN(d_model=512, num_tiles=64)  # use_gradient_truth=True by d
 
 ---
 
+### TrueOctaveFFN
+
+Gradient Truth implementation with frozen directions and learned scales.
+
+```python
+class TrueOctaveFFN(nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        num_fine_tiles: int = 16,
+        pool_factor: int = 4,
+        dropout: float = 0.1,
+    ):
+        """
+        Args:
+            d_model: Input/output dimension
+            num_fine_tiles: Number of direction tiles
+            pool_factor: Pooling factor for fine tile selection
+            dropout: Dropout probability
+        """
+```
+
+**Concept:**
+- Frozen ternary directions (discovered, not learned)
+- Learned per-tile scales (magnitude modulation)
+- No STE - gradients only flow through scales and routing
+- Hierarchical coarse-to-fine tile selection
+
+See [TRUE_OCTAVE.md](TRUE_OCTAVE.md) for full theory.
+
+---
+
+### AnchoredDualModeFFN
+
+Anchor-informed routing with frozen anchors and learned tile selection.
+
+```python
+class AnchoredDualModeFFN(nn.Module):
+    def __init__(
+        self,
+        d_model: int = 512,
+        num_anchors: int = 16,
+        num_tiles: int = 64,
+        temperature: float = 1.0,
+        dropout: float = 0.1,
+    ):
+        """
+        Args:
+            d_model: Input/output dimension
+            num_anchors: Number of frozen anchor partitions
+            num_tiles: Number of execution tiles
+            temperature: Softmax temperature (lower = harder partitions)
+            dropout: Dropout probability
+        """
+```
+
+**Concept:**
+- **Anchors** partition input space (frozen, fast)
+- **Router** sees input + anchor, selects tile (learned)
+- **Tiles** apply frozen direction + learned scale
+- Two deployment modes: chips (shapes only) or modal-models (shapes + routing)
+
+**Key Methods:**
+
+```python
+# Set temperature for partition sharpness
+ffn.set_temperature(0.1)  # Hard partitions
+
+# Get anchor utilization
+usage = ffn.get_anchor_utilization()
+
+# Compute regularization loss
+reg_loss = ffn.compute_anchor_loss(target_entropy=2.0)
+```
+
+**Training with Temperature Annealing:**
+
+```python
+from trix.nn import get_temperature_schedule
+
+for step in range(total_steps):
+    temp = get_temperature_schedule(step, total_steps, start_temp=2.0, end_temp=0.1)
+    ffn.set_temperature(temp)
+    # ... training step ...
+```
+
+See [ANCHORED_DUAL_MODE.md](ANCHORED_DUAL_MODE.md) for full theory.
+
+---
+
+### AnchoredDualModeBlock
+
+Transformer block with attention + AnchoredDualModeFFN.
+
+```python
+class AnchoredDualModeBlock(nn.Module):
+    def __init__(
+        self,
+        d_model: int = 512,
+        num_heads: int = 8,
+        num_anchors: int = 16,
+        num_tiles: int = 64,
+        temperature: float = 1.0,
+        dropout: float = 0.1,
+    ):
+        """
+        Args:
+            d_model: Model dimension
+            num_heads: Number of attention heads
+            num_anchors: Number of anchor partitions
+            num_tiles: Number of execution tiles
+            temperature: Initial temperature
+            dropout: Dropout probability
+        """
+```
+
+---
+
 ### TemporalTileLayer
 
 State-aware routing for sequential tasks.

@@ -13,6 +13,7 @@ This document provides a comprehensive overview of the TriX architecture for res
 7. [Inference Optimization](#inference-optimization)
 8. [XOR Superposition Compression](#xor-superposition-compression)
 9. [Providence: The Unified Architecture](#providence-the-unified-architecture)
+10. [Dual-Mode Architecture](#dual-mode-architecture)
 
 ---
 
@@ -613,6 +614,57 @@ See [XORPU_COMPLETE.md](XORPU_COMPLETE.md) for detailed XORPU documentation.
 
 ---
 
+## Dual-Mode Architecture
+
+The latest evolution: **AnchoredDualModeFFN** - supporting both deterministic chips and probabilistic modal-models from a single substrate.
+
+### The Insight
+
+Speedup comes from NOT searching, not from searching faster. When frozen anchors partition the input space, the probabilistic router operates on a constrained problem.
+
+### Architecture
+
+```
+Input ──┬──→ [Anchors] ──→ partition (frozen)
+        │        │
+        │        ↓
+        └──→ [Router] ──→ tile selection (learned)
+                    │
+                    ↓
+            [Tile] ──→ output (frozen direction + learned scale)
+```
+
+### Two Deployment Modes
+
+| Mode | What Runs | Use Case |
+|------|-----------|----------|
+| **Chips** | Anchors + Tiles only | Deterministic silicon |
+| **Modal-models** | Full architecture | Probabilistic search with constraints |
+
+### The Shoreline Metaphor
+
+- **Shoreline**: Frozen shapes - where you CAN'T go
+- **Ocean**: Possibility space - where you CAN go
+- **Navigation**: Routing - choosing where to go within constraints
+
+The shoreline doesn't move. It partitions reality. The navigator uses it.
+
+### Components
+
+1. **Anchors** (frozen): Ternary signatures partition input space via Hamming similarity
+2. **Router** (learned): Sees input + anchor partition, selects tile
+3. **Tiles** (frozen direction, learned scale): Apply constrained transformation
+
+### Temperature Annealing
+
+Partition sharpness controlled by temperature:
+- **Training**: Start warm (soft partitions, exploration)
+- **Inference**: End cold (hard partitions, commitment)
+
+See [ANCHORED_DUAL_MODE.md](ANCHORED_DUAL_MODE.md) for complete theory and implementation details.
+
+---
+
 ## The Unified View
 
 ```
@@ -642,6 +694,9 @@ Train with gradients (Providence). Compile with algebra (Foundry). Execute with 
 
 - [THE_WAY.md](THE_WAY.md) - The unified philosophy
 - [Providence](PROVIDENCE.md) - The unified neural architecture
+- [ANCHORED_DUAL_MODE.md](ANCHORED_DUAL_MODE.md) - Dual-mode architecture (chips + modal-models)
+- [GRADIENT_TRUTH.md](GRADIENT_TRUTH.md) - Training without STE
+- [TRUE_OCTAVE.md](TRUE_OCTAVE.md) - Hierarchical frozen architecture
 - [XORPU_COMPLETE.md](XORPU_COMPLETE.md) - Deterministic computation details
 - [Theory](THEORY.md) - Mathematical foundations
 - [API Reference](API.md) - Complete API documentation

@@ -236,6 +236,16 @@ from .frozen_6502_net import (
     get_opcode_name,
 )
 
+# =============================================================================
+# ANCHORED DUAL-MODE (Partition First, Search Within)
+# =============================================================================
+
+from .anchored import (
+    AnchoredDualModeFFN,
+    AnchoredDualModeBlock,
+    get_temperature_schedule,
+)
+
 __all__ = [
     # Recommended - emergent routing (zero parameters)
     "TriXFFN",
@@ -381,4 +391,8 @@ __all__ = [
     "ShapeGenesis",
     "create_gradient_truth_ffn",
     "create_gradient_truth_block",
+    # Anchored Dual-Mode (Partition First, Search Within)
+    "AnchoredDualModeFFN",
+    "AnchoredDualModeBlock",
+    "get_temperature_schedule",
 ]
