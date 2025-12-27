@@ -247,16 +247,21 @@ class OctaveIndex:
         else:
             query_magnitudes = np.asarray(query_magnitudes, dtype=np.float32)
         
-        # Funnel widths based on mode
+        # PHI FUNNEL: Golden ratio narrowing at each octave
+        # φ = 1.618... - the spiral to convergence
+        PHI = 1.6180339887
+        
         if mode == "context":
             oc2_keep = self.num_documents  # Keep all at coarse
             oc1_keep = self.num_documents  # Keep all at medium
         elif mode == "exact":
-            oc2_keep = max(top_k * 5, 20)   # Tight funnel
-            oc1_keep = max(top_k * 2, 10)
+            # Tight spiral: φ^2 and φ from top_k
+            oc1_keep = max(int(top_k * PHI), top_k + 1)
+            oc2_keep = max(int(oc1_keep * PHI), oc1_keep + 1)
         else:  # similar
-            oc2_keep = max(top_k * 10, 50)  # Balanced funnel
-            oc1_keep = max(top_k * 3, 15)
+            # Balanced spiral: φ^3 and φ^2 from top_k
+            oc1_keep = max(int(top_k * PHI * PHI), top_k + 2)
+            oc2_keep = max(int(oc1_keep * PHI), oc1_keep + 1)
         
         # Normalization factors
         coarse_norm = max(np.sum(np.abs(query_coarse)), 1)
