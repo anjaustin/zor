@@ -30,9 +30,18 @@ from .index import OctaveIndex
 
 from .octave_db import OctaveDB
 
+from .explorer import (
+    PossibilityExplorer,
+    ExplorationResult,
+    compare_approaches,
+)
+
 __all__ = [
     "OctaveDB",
-    "OctaveIndex", 
+    "OctaveIndex",
+    "PossibilityExplorer",
+    "ExplorationResult",
+    "compare_approaches",
     "ternary_quantize",
     "derive_coarse",
     "ternary_similarity",
