@@ -36,6 +36,24 @@ from .explorer import (
     compare_approaches,
 )
 
+from .codex import (
+    CodexField,
+    CodexLayer,
+    GeneKeyTile,
+    CodexEdge,
+    load_codex_from_json,
+)
+
+from .codex_keywords import (
+    KeywordCodex,
+    KeywordCodexLayer,
+    GeneKeyNode,
+    create_codex,
+    GENE_KEYS,
+    PARTNERS,
+    CODON_RINGS,
+)
+
 __all__ = [
     "OctaveDB",
     "OctaveIndex",
@@ -47,4 +65,18 @@ __all__ = [
     "ternary_similarity",
     "pack_ternary",
     "unpack_ternary",
+    # Codex Layer (embedding-based)
+    "CodexField",
+    "CodexLayer", 
+    "GeneKeyTile",
+    "CodexEdge",
+    "load_codex_from_json",
+    # Codex Layer (keyword-based)
+    "KeywordCodex",
+    "KeywordCodexLayer",
+    "GeneKeyNode",
+    "create_codex",
+    "GENE_KEYS",
+    "PARTNERS",
+    "CODON_RINGS",
 ]
