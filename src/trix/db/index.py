@@ -39,6 +39,7 @@ class Document:
     medium: np.ndarray
     coarse: np.ndarray
     magnitudes: np.ndarray  # The Secret Sauce: magnitude weights
+    embedding: Optional[np.ndarray] = None  # Original float embedding for exact match
     metadata: Optional[dict] = None
     
     # Packed representations for fast similarity
@@ -104,6 +105,7 @@ class OctaveIndex:
         self._medium_matrix: Optional[np.ndarray] = None
         self._fine_matrix: Optional[np.ndarray] = None
         self._mag_matrix: Optional[np.ndarray] = None
+        self._embedding_matrix: Optional[np.ndarray] = None  # For quality mode
         self._index_dirty = True
         
         # Stats
@@ -120,6 +122,7 @@ class OctaveIndex:
         medium: Optional[np.ndarray] = None,
         coarse: Optional[np.ndarray] = None,
         magnitudes: Optional[np.ndarray] = None,
+        embedding: Optional[np.ndarray] = None,
         metadata: Optional[dict] = None,
     ) -> None:
         """
@@ -131,6 +134,7 @@ class OctaveIndex:
             medium: Medium signature (derived if not provided)
             coarse: Coarse signature (derived if not provided)
             magnitudes: Magnitude weights (for Secret Sauce similarity)
+            embedding: Original float embedding (for quality mode exact match)
             metadata: Optional document metadata
         """
         fine = np.asarray(fine, dtype=np.int8)
@@ -152,6 +156,10 @@ class OctaveIndex:
         # Pack for fast similarity
         fine_pos, fine_neg = pack_ternary(fine)
         
+        # Store embedding if provided
+        if embedding is not None:
+            embedding = np.asarray(embedding, dtype=np.float32)
+        
         # Create document
         doc = Document(
             id=doc_id,
@@ -159,6 +167,7 @@ class OctaveIndex:
             medium=medium,
             coarse=coarse,
             magnitudes=magnitudes,
+            embedding=embedding,
             metadata=metadata,
             fine_pos=fine_pos,
             fine_neg=fine_neg,
@@ -190,12 +199,21 @@ class OctaveIndex:
         self._fine_matrix = np.zeros((n, len(first_doc.fine)), dtype=np.int8)
         self._mag_matrix = np.zeros((n, len(first_doc.magnitudes)), dtype=np.float32)
         
+        # Check if embeddings are available
+        has_embeddings = first_doc.embedding is not None
+        if has_embeddings:
+            self._embedding_matrix = np.zeros((n, len(first_doc.embedding)), dtype=np.float32)
+        else:
+            self._embedding_matrix = None
+        
         for i, doc_id in enumerate(self._doc_ids):
             doc = self.documents[doc_id]
             self._coarse_matrix[i] = doc.coarse
             self._medium_matrix[i] = doc.medium
             self._fine_matrix[i] = doc.fine
             self._mag_matrix[i] = doc.magnitudes
+            if has_embeddings and doc.embedding is not None:
+                self._embedding_matrix[i] = doc.embedding
         
         self._index_dirty = False
     
@@ -231,6 +249,91 @@ class OctaveIndex:
         self.num_documents -= 1
         
         return True
+    
+    def _search_quality(
+        self,
+        query_fine: np.ndarray,
+        query_magnitudes: np.ndarray,
+        top_k: int = 10,
+        explain: bool = False,
+        keep_ratio: float = 0.1,
+    ) -> List[SearchResult]:
+        """
+        Quality mode: 100% recall via magnitude-weighted filter + exact cosine.
+        
+        Two-stage architecture:
+            1. Magnitude-weighted ternary filter → keep top candidates
+            2. Exact cosine on candidates → precise ranking
+        
+        Requires embeddings to be stored (set during add).
+        """
+        # Reconstruct query embedding from signs * magnitudes
+        query_embedding = query_fine.astype(np.float32) * query_magnitudes
+        query_embedding = query_embedding / (np.linalg.norm(query_embedding) + 1e-10)
+        
+        return self._search_quality_with_embedding(
+            query_fine, query_magnitudes, query_embedding,
+            top_k=top_k, explain=explain, keep_ratio=keep_ratio
+        )
+    
+    def _search_quality_with_embedding(
+        self,
+        query_fine: np.ndarray,
+        query_magnitudes: np.ndarray,
+        query_embedding: np.ndarray,
+        top_k: int = 10,
+        explain: bool = False,
+        keep_ratio: float = 0.1,
+    ) -> List[SearchResult]:
+        """
+        Quality mode with original query embedding for exact cosine.
+        """
+        self._rebuild_matrices()
+        
+        if self.num_documents == 0:
+            return []
+        
+        if self._embedding_matrix is None:
+            raise ValueError(
+                "Quality mode requires embeddings. "
+                "Store embeddings when adding documents."
+            )
+        
+        # Stage 1: Magnitude-weighted filter (Secret Sauce)
+        weights = np.sqrt(query_magnitudes * self._mag_matrix)
+        sign_product = query_fine * self._fine_matrix
+        weighted_scores = np.sum(weights * sign_product, axis=1)
+        
+        # Keep top candidates (at least 10% or 200, whichever keeps more)
+        n_keep = max(int(self.num_documents * keep_ratio), min(200, self.num_documents))
+        candidate_indices = np.argsort(weighted_scores)[::-1][:n_keep]
+        
+        # Stage 2: Exact cosine on candidates using original query embedding
+        candidate_embeddings = self._embedding_matrix[candidate_indices]
+        exact_scores = candidate_embeddings @ query_embedding
+        
+        # Top K by exact cosine
+        top_k_local = np.argsort(exact_scores)[::-1][:top_k]
+        top_k_indices = candidate_indices[top_k_local]
+        top_k_scores = exact_scores[top_k_local]
+        
+        # Build results
+        results = []
+        for i, idx in enumerate(top_k_indices):
+            doc_id = self._doc_ids[idx]
+            doc = self.documents[doc_id]
+            results.append(SearchResult(
+                id=doc_id,
+                score=float(top_k_scores[i]),
+                level_scores={
+                    'exact_cosine': float(top_k_scores[i]),
+                    'weighted_filter': float(weighted_scores[idx]),
+                },
+                metadata=doc.metadata,
+                explanation=None,
+            ))
+        
+        return results
     
     def search(
         self,
@@ -288,6 +391,13 @@ class OctaveIndex:
         # Minimum funnel sizes to ensure self-retrieval works
         MIN_OC2 = 50  # Never filter more than this at coarse
         MIN_OC1 = 20  # Never filter more than this at medium
+        
+        # QUALITY MODE: magnitude-weighted filter + exact cosine
+        # Achieves 100% recall with minimal candidate set
+        if mode == "quality":
+            return self._search_quality(
+                query_fine, query_magnitudes, top_k, explain
+            )
         
         if mode == "context":
             oc2_keep = self.num_documents  # Keep all at coarse

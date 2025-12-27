@@ -119,6 +119,7 @@ class OctaveDB:
         embedding: Union[np.ndarray, str],
         metadata: Optional[dict] = None,
         is_ternary: bool = False,
+        store_embedding: bool = True,
     ) -> None:
         """
         Add document to database.
@@ -128,6 +129,7 @@ class OctaveDB:
             embedding: Float embedding array OR text (if embedder configured)
             metadata: Optional metadata dict
             is_ternary: If True, embedding is already ternary (legacy)
+            store_embedding: If True, store original for quality mode (default True)
         """
         # Handle text input
         if isinstance(embedding, str):
@@ -135,6 +137,15 @@ class OctaveDB:
             is_ternary = False
         
         embedding = np.asarray(embedding, dtype=np.float32)
+        
+        # Normalize embedding for storage
+        original_embedding = None
+        if store_embedding and not is_ternary:
+            norm = np.linalg.norm(embedding)
+            if norm > 0:
+                original_embedding = embedding / norm
+            else:
+                original_embedding = embedding.copy()
         
         # Quantize to octave representation (Secret Sauce)
         if is_ternary:
@@ -145,8 +156,13 @@ class OctaveDB:
             # The Secret Sauce: keep both signs AND magnitudes
             signs, magnitudes = self._to_octave(embedding)
         
-        # Add to index with magnitudes
-        self.index.add(doc_id, signs, magnitudes=magnitudes, metadata=metadata)
+        # Add to index with magnitudes and optional embedding
+        self.index.add(
+            doc_id, signs, 
+            magnitudes=magnitudes, 
+            embedding=original_embedding,
+            metadata=metadata
+        )
     
     def add_batch(
         self,
@@ -211,6 +227,22 @@ class OctaveDB:
             query_magnitudes = np.ones(len(query_signs), dtype=np.float32)
         else:
             query_signs, query_magnitudes = self._to_octave(query)
+        
+        # For quality mode, pass original query embedding
+        if mode == "quality":
+            # Normalize query for exact cosine
+            norm = np.linalg.norm(query)
+            if norm > 0:
+                query_normalized = query / norm
+            else:
+                query_normalized = query
+            return self.index._search_quality_with_embedding(
+                query_signs,
+                query_magnitudes,
+                query_normalized,
+                top_k=top_k,
+                explain=explain,
+            )
         
         # Search with Secret Sauce (magnitude-weighted)
         return self.index.search(
