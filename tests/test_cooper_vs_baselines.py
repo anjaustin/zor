@@ -277,13 +277,12 @@ class TestCooperVsExactSearch:
         mean_recall = np.mean(recalls)
         assert mean_recall >= 0.95, f"Quality mode recall@{TOP_K} {mean_recall:.2%} < 95%"
     
-    def test_similar_mode_approximate(self, test_data):
+    def test_similar_mode_recall(self, test_data):
         """
-        Similar mode is approximate - lower recall expected.
+        Similar mode achieves good recall through brute-force on small datasets.
         
-        KNOWN LIMITATION: Similar mode uses aggressive pruning in the
-        hierarchical funnel which causes low recall on random vectors.
-        Use quality mode for high recall requirements.
+        For N < 10K, Cooper skips hierarchical pruning and uses direct
+        magnitude-weighted search, achieving high recall.
         """
         vectors, queries = test_data
         
@@ -297,16 +296,14 @@ class TestCooperVsExactSearch:
             similarities = np.dot(vectors, query)
             exact_topk = set(np.argsort(similarities)[-TOP_K:])
             
-            # Cooper similar mode (approximate)
+            # Cooper similar mode
             cooper_topk = set(int(r.id.split("_")[1]) for r in db.search(query, top_k=TOP_K, mode="similar"))
             
             recalls.append(compute_recall(cooper_topk, exact_topk))
         
         mean_recall = np.mean(recalls)
-        # Similar mode has known low recall on random vectors
-        # This test documents the current behavior; quality mode should be used for high recall
-        assert mean_recall >= 0.0, f"Similar mode should return some results"
-        print(f"\n[INFO] Similar mode recall@{TOP_K}: {mean_recall:.2%} (use quality mode for high recall)")
+        # With brute-force for N < 10K, similar mode achieves good recall
+        assert mean_recall >= 0.50, f"Similar mode recall@{TOP_K} {mean_recall:.2%} < 50%"
 
 
 class TestEdgeCases:

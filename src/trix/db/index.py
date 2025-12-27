@@ -389,10 +389,6 @@ class OctaveIndex:
         # φ = 1.618... - the spiral to convergence
         PHI = 1.6180339887
         
-        # Minimum funnel sizes to ensure self-retrieval works
-        MIN_OC2 = 50  # Never filter more than this at coarse
-        MIN_OC1 = 20  # Never filter more than this at medium
-        
         # QUALITY MODE: magnitude-weighted filter + exact cosine
         # Achieves 100% recall with minimal candidate set
         if mode == "quality":
@@ -400,15 +396,26 @@ class OctaveIndex:
                 query_fine, query_magnitudes, top_k, explain
             )
         
-        if mode == "context":
-            oc2_keep = self.num_documents  # Keep all at coarse
-            oc1_keep = self.num_documents  # Keep all at medium
+        # ═══════════════════════════════════════════════════════════════
+        # ENGINEERING FIX: Skip hierarchy for small datasets
+        # Brute-force is fast enough for N < 10K and guarantees recall
+        # ═══════════════════════════════════════════════════════════════
+        BRUTE_FORCE_THRESHOLD = 10000
+        
+        if self.num_documents <= BRUTE_FORCE_THRESHOLD or mode == "context":
+            # Direct magnitude-weighted search on all documents
+            oc2_keep = self.num_documents
+            oc1_keep = self.num_documents
         elif mode == "exact":
-            # Tight spiral: φ^2 and φ from top_k, with minimums
+            # Tight spiral with reasonable minimums
+            MIN_OC1 = max(100, int(self.num_documents * 0.05))  # At least 5%
+            MIN_OC2 = max(200, int(self.num_documents * 0.10))  # At least 10%
             oc1_keep = max(int(top_k * PHI), MIN_OC1)
             oc2_keep = max(int(oc1_keep * PHI), MIN_OC2)
         else:  # similar
-            # Balanced spiral: φ^3 and φ^2 from top_k, with minimums
+            # Wider funnel for better recall
+            MIN_OC1 = max(200, int(self.num_documents * 0.10))  # At least 10%
+            MIN_OC2 = max(500, int(self.num_documents * 0.20))  # At least 20%
             oc1_keep = max(int(top_k * PHI * PHI), MIN_OC1)
             oc2_keep = max(int(oc1_keep * PHI), MIN_OC2)
         
