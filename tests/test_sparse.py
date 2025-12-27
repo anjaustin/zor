@@ -3,6 +3,9 @@ Tests for Sparse Training Components (Option B)
 
 Tests SparseTriXFFN and SparseTriXBlock - the components that enable
 training with gated computation from the start.
+
+NOTE: This tests archived modules. SparseTriXFFN is superseded by HierarchicalTriXFFN.
+See trix.nn.archive.ARCHIVE_INDEX.md for details.
 """
 
 import pytest
@@ -13,7 +16,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from trix.nn.sparse import SparseTriXFFN, SparseTriXBlock
+from trix.nn.archive.sparse import SparseTriXFFN, SparseTriXBlock
 
 
 class TestSparseTriXFFN:

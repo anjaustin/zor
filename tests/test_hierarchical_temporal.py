@@ -7,13 +7,16 @@ Tests cover:
 - State persistence across forward calls
 - Transition tracking
 - Regime analysis
+
+NOTE: This tests archived modules. HierarchicalTemporalFFN is superseded by ProvidenceFFN.
+See trix.nn.archive.ARCHIVE_INDEX.md for details.
 """
 
 import pytest
 import torch
 import torch.nn as nn
 
-from trix.nn.hierarchical_temporal import (
+from trix.nn.archive.hierarchical_temporal import (
     TemporalTile,
     HierarchicalTemporalFFN,
     create_hierarchical_temporal_ffn,

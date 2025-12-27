@@ -8,6 +8,9 @@ Tests:
   4. Score calibration spline
   5. Integration with blocks
   6. Edge cases and stability
+
+NOTE: This tests archived modules. SparseLookupFFNv2 is superseded by SparseLookupFFN.
+See trix.nn.archive.ARCHIVE_INDEX.md for details.
 """
 
 import pytest
@@ -16,7 +19,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-from trix.nn.sparse_lookup_v2 import (
+from trix.nn.archive.sparse_lookup_v2 import (
     SparseLookupFFNv2,
     SparseLookupBlockV2,
     ScoreCalibrationSpline,

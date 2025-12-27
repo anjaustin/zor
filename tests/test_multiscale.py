@@ -2,11 +2,14 @@
 Tests for MultiScaleTriXFFN.
 
 Tests both generative (soft) and deterministic (hard) modes.
+
+NOTE: This tests archived modules. MultiScaleTriXFFN is superseded by TrueOctaveFFN.
+See trix.nn.archive.ARCHIVE_INDEX.md for details.
 """
 
 import torch
 import pytest
-from trix.nn.multiscale import (
+from trix.nn.archive.multiscale import (
     MultiScaleTriXFFN,
     MultiScaleTriXBlock,
     Octave,
