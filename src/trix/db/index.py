@@ -209,9 +209,12 @@ class OctaveIndex:
         explain: bool = False,
     ) -> List[SearchResult]:
         """
-        Search index with multi-resolution filtering.
+        Cascading octave search: Oc2 → Oc1 → Oc0.
         
-        Uses magnitude-weighted similarity (Secret Sauce) for fine ranking.
+        The funnel:
+            Oc2 (coarse): Fast fuzzy filter, broad candidates
+            Oc1 (medium): Converge, narrow down
+            Oc0 (fine):   Near-exact, final ranking (with Secret Sauce)
         
         Args:
             query_fine: Fine query signature (signs)
@@ -219,9 +222,9 @@ class OctaveIndex:
             query_coarse: Coarse signature (derived if not provided)
             query_magnitudes: Query magnitude weights (for Secret Sauce)
             mode: "exact" | "similar" | "context"
-                - exact: strict fine-level matching
-                - similar: balanced multi-level
-                - context: broad coarse-level discovery
+                - exact: tight funnel, strict convergence
+                - similar: balanced funnel
+                - context: wide funnel, broad discovery
             top_k: Number of results to return
             explain: Whether to include per-dimension explanations
         
@@ -244,50 +247,66 @@ class OctaveIndex:
         else:
             query_magnitudes = np.asarray(query_magnitudes, dtype=np.float32)
         
-        # Normalization factors
-        fine_norm = max(np.sum(np.abs(query_fine)), 1)
-        medium_norm = max(np.sum(np.abs(query_medium)), 1)
-        coarse_norm = max(np.sum(np.abs(query_coarse)), 1)
-        
-        # Phase 1: Coarse filtering
-        candidates = []
-        for key, doc_ids in self.coarse_buckets.items():
-            bucket_sig = np.array(key, dtype=np.int8)
-            coarse_score = ternary_similarity(query_coarse, bucket_sig) / coarse_norm
-            
-            if coarse_score >= self.coarse_threshold or mode == "context":
-                for doc_id in doc_ids:
-                    candidates.append((doc_id, coarse_score))
-        
-        # If context mode, just return by coarse score
+        # Funnel widths based on mode
         if mode == "context":
-            candidates.sort(key=lambda x: -x[1])
+            oc2_keep = self.num_documents  # Keep all at coarse
+            oc1_keep = self.num_documents  # Keep all at medium
+        elif mode == "exact":
+            oc2_keep = max(top_k * 5, 20)   # Tight funnel
+            oc1_keep = max(top_k * 2, 10)
+        else:  # similar
+            oc2_keep = max(top_k * 10, 50)  # Balanced funnel
+            oc1_keep = max(top_k * 3, 15)
+        
+        # Normalization factors
+        coarse_norm = max(np.sum(np.abs(query_coarse)), 1)
+        medium_norm = max(np.sum(np.abs(query_medium)), 1)
+        
+        # ═══════════════════════════════════════════════════════════════
+        # Oc2 (COARSE): Fuzzy, fastest - broad candidates
+        # ═══════════════════════════════════════════════════════════════
+        oc2_candidates = []
+        for doc_id, doc in self.documents.items():
+            coarse_score = ternary_similarity(query_coarse, doc.coarse) / coarse_norm
+            oc2_candidates.append((doc_id, coarse_score))
+        
+        # Sort by coarse score, keep top candidates
+        oc2_candidates.sort(key=lambda x: -x[1])
+        oc2_candidates = oc2_candidates[:oc2_keep]
+        
+        # If context mode, return coarse results directly
+        if mode == "context":
             results = []
-            for doc_id, coarse_score in candidates[:top_k]:
+            for doc_id, coarse_score in oc2_candidates[:top_k]:
                 doc = self.documents[doc_id]
                 results.append(SearchResult(
                     id=doc_id,
                     score=coarse_score,
-                    level_scores={'coarse': coarse_score},
+                    level_scores={'coarse': coarse_score, 'medium': 0.0, 'fine': 0.0},
                     metadata=doc.metadata,
                     explanation=explain_match(query_coarse, doc.coarse) if explain else None,
                 ))
             return results
         
-        # Phase 2: Medium reranking
-        scored = []
-        for doc_id, coarse_score in candidates:
+        # ═══════════════════════════════════════════════════════════════
+        # Oc1 (MEDIUM): More convergence, faster - narrow down
+        # ═══════════════════════════════════════════════════════════════
+        oc1_candidates = []
+        for doc_id, coarse_score in oc2_candidates:
             doc = self.documents[doc_id]
             medium_score = ternary_similarity(query_medium, doc.medium) / medium_norm
-            scored.append((doc_id, coarse_score, medium_score))
+            oc1_candidates.append((doc_id, coarse_score, medium_score))
         
-        # Sort by medium, keep top candidates
-        scored.sort(key=lambda x: -x[2])
-        scored = scored[:min(len(scored), top_k * 10)]
+        # Sort by medium score, keep top candidates
+        oc1_candidates.sort(key=lambda x: -x[2])
+        oc1_candidates = oc1_candidates[:oc1_keep]
         
-        # Phase 3: Fine reranking with SECRET SAUCE (magnitude-weighted)
-        final = []
-        for doc_id, coarse_score, medium_score in scored:
+        # ═══════════════════════════════════════════════════════════════
+        # Oc0 (FINE): Near-exact convergence - final ranking
+        # Uses SECRET SAUCE (magnitude-weighted similarity)
+        # ═══════════════════════════════════════════════════════════════
+        oc0_results = []
+        for doc_id, coarse_score, medium_score in oc1_candidates:
             doc = self.documents[doc_id]
             
             # THE SECRET SAUCE: magnitude-weighted similarity
@@ -300,23 +319,19 @@ class OctaveIndex:
             max_score = np.sum(np.sqrt(query_magnitudes * doc.magnitudes))
             fine_score = octave_score / max_score if max_score > 0 else 0.0
             
-            # Combined score (weighted by mode)
-            if mode == "exact":
-                combined = fine_score  # Only fine matters
-            else:  # similar
-                combined = 0.6 * fine_score + 0.3 * medium_score + 0.1 * coarse_score
-            
-            final.append((doc_id, combined, {
+            # Final score is fine score (the others were just for filtering)
+            oc0_results.append((doc_id, fine_score, {
                 'fine': fine_score,
                 'medium': medium_score,
                 'coarse': coarse_score,
             }))
         
-        # Sort and return
-        final.sort(key=lambda x: -x[1])
+        # Sort by fine score (the final word)
+        oc0_results.sort(key=lambda x: -x[1])
         
+        # Build results
         results = []
-        for doc_id, score, level_scores in final[:top_k]:
+        for doc_id, score, level_scores in oc0_results[:top_k]:
             doc = self.documents[doc_id]
             results.append(SearchResult(
                 id=doc_id,
