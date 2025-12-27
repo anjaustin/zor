@@ -161,6 +161,7 @@ class PossibilityExplorer:
         query_id: str = "query",
         explore_k: int = 400,
         top_k: int = 10,
+        gap_threshold: float = 0.096369,
     ) -> ExplorationResult:
         """
         Explore the possibility space for a query.
@@ -237,29 +238,62 @@ class PossibilityExplorer:
         )
         
         # Stage 4: Determine dominant concept
-        # Use average score, not just count
-        concept_ranking = sorted(
-            concept_clusters.items(),
-            key=lambda x: x[1].avg_score,
-            reverse=True
-        )
+        # INSIGHT: Trust the score when confident, use concept detection when not.
         
-        dominant_concept = concept_ranking[0][0]
-        dominant_cluster = concept_ranking[0][1]
+        # First, check for a clear winner (one concept's best significantly exceeds others)
+        concept_best = {
+            concept: cluster.max_score 
+            for concept, cluster in concept_clusters.items()
+        }
+        sorted_by_best = sorted(concept_best.items(), key=lambda x: -x[1])
         
-        # Confidence: gap between dominant and runner-up
-        if len(concept_ranking) > 1:
-            runner_up = concept_ranking[1][1]
-            confidence = (dominant_cluster.avg_score - runner_up.avg_score) / (
-                dominant_cluster.avg_score + 0.001
+        clear_winner = False
+        if len(sorted_by_best) >= 2:
+            best_concept, best_score = sorted_by_best[0]
+            second_concept, second_score = sorted_by_best[1]
+            gap = best_score - second_score
+            
+            if gap >= gap_threshold:
+                # Clear winner - trust the similarity score
+                clear_winner = True
+                dominant_concept = best_concept
+                dominant_cluster = concept_clusters[dominant_concept]
+                confidence = min(1.0, 0.5 + gap)  # Higher gap = higher confidence
+                
+                decisions.append(
+                    f"Clear winner detected: '{best_concept}' "
+                    f"(best={best_score:.3f}) vs '{second_concept}' "
+                    f"(best={second_score:.3f}), gap={gap:.3f} >= {gap_threshold}"
+                )
+        
+        if not clear_winner:
+            # Ambiguous - fall back to avg-based concept detection
+            concept_ranking = sorted(
+                concept_clusters.items(),
+                key=lambda x: x[1].avg_score,
+                reverse=True
             )
-            confidence = min(1.0, max(0.0, confidence + 0.5))  # Normalize to 0-1
-        else:
-            confidence = 1.0
+            
+            dominant_concept = concept_ranking[0][0]
+            dominant_cluster = concept_ranking[0][1]
+            
+            # Confidence based on avg gap
+            if len(concept_ranking) > 1:
+                runner_up = concept_ranking[1][1]
+                avg_gap = dominant_cluster.avg_score - runner_up.avg_score
+                confidence = min(1.0, max(0.0, avg_gap / 0.2 + 0.5))
+            else:
+                confidence = 1.0
+            
+            decisions.append(
+                f"Ambiguous (gap < {gap_threshold}), using avg-based detection: "
+                f"'{dominant_concept}' (avg={dominant_cluster.avg_score:.3f})"
+            )
         
         decisions.append(
             f"Dominant concept: '{dominant_concept}' "
-            f"(avg score {dominant_cluster.avg_score:.3f}, "
+            f"(max={dominant_cluster.max_score:.3f}, "
+            f"avg={dominant_cluster.avg_score:.3f}, "
             f"{dominant_cluster.count} candidates)"
         )
         decisions.append(f"Confidence: {confidence:.0%}")
