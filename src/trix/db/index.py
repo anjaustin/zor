@@ -256,7 +256,7 @@ class OctaveIndex:
         query_magnitudes: np.ndarray,
         top_k: int = 10,
         explain: bool = False,
-        keep_ratio: float = 0.1,
+        keep_ratio: float = 0.2,
     ) -> List[SearchResult]:
         """
         Quality mode: 100% recall via magnitude-weighted filter + exact cosine.
@@ -283,7 +283,7 @@ class OctaveIndex:
         query_embedding: np.ndarray,
         top_k: int = 10,
         explain: bool = False,
-        keep_ratio: float = 0.1,
+        keep_ratio: float = 0.2,
     ) -> List[SearchResult]:
         """
         Quality mode with original query embedding for exact cosine.
@@ -304,8 +304,9 @@ class OctaveIndex:
         sign_product = query_fine * self._fine_matrix
         weighted_scores = np.sum(weights * sign_product, axis=1)
         
-        # Keep top candidates (at least 10% or 200, whichever keeps more)
-        n_keep = max(int(self.num_documents * keep_ratio), min(200, self.num_documents))
+        # Keep top candidates (at least 20% or 500, whichever keeps more)
+        # Conservative default for enterprise-grade recall
+        n_keep = max(int(self.num_documents * keep_ratio), min(500, self.num_documents))
         candidate_indices = np.argsort(weighted_scores)[::-1][:n_keep]
         
         # Stage 2: Exact cosine on candidates using original query embedding
