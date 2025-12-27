@@ -1,27 +1,39 @@
 """
 TriX Neural Network Layers
 
-High-level neural network components built on TriX sparse layers.
+Production-ready neural network components with frozen ternary computation.
 
-Recommended (emergent routing):
-- TriXFFN: Feed-forward network with signature-based routing
-- TriXBlock: Transformer block with TriXFFN
-- TriXStack: Stack of transformer blocks
+CORE ARCHITECTURES (Production):
+- TriXFFN: Base FFN with signature-based emergent routing
+- HierarchicalTriXFFN: O(sqrt(n)) scaling for 64-1000+ tiles
+- AnchoredDualModeFFN: Partition-first, dual deployment modes
+- TrueOctaveFFN: Multi-resolution derived views
+- ProvidenceFFN: Unified architecture (XOR + shapes + state)
+- GradientTruthFFN: Explicit 3-layer decomposition
 
-Alternative (learned routing):
-- GatedFFN: Feed-forward network with learned gate network
+ROUTING:
+- XORRoutingFFN: Hamming distance routing (O(1) vs O(d))
+- SparseLookupFFN: Spline-based routing
+
+SHAPES (Frozen Computation):
+- FrozenTriXFFN: Content-addressable frozen shapes
+- Frozen6502: CPU emulation (40x compression)
+
+RESEARCH (Separate tracks):
+- trix.nn.research.kan: Kolmogorov-Arnold Networks (Track B)
+- trix.nn.research.sdpmx: Vi's Synthesis (SDPMX Pipeline)
+
+ARCHIVE (Superseded, preserved for reference):
+- trix.nn.archive: Deprecated modules with breadcrumbs
+
+Consolidated: December 27, 2025
 """
 
-from .layers import (
-    Top1Gate,
-    GatedFFN,
-    TriXTransformerBlock,
-)
+import warnings
 
-from .emergent import (
-    EmergentGatedFFN,
-    EmergentTransformerBlock,
-)
+# =============================================================================
+# CORE: Base FFN (Emergent Routing)
+# =============================================================================
 
 from .trix import (
     TriXFFN,
@@ -29,10 +41,9 @@ from .trix import (
     TriXStack,
 )
 
-from .sparse import (
-    SparseTriXFFN,
-    SparseTriXBlock,
-)
+# =============================================================================
+# CORE: Hierarchical (O(sqrt(n)) Scaling)
+# =============================================================================
 
 from .hierarchical import (
     TriXTile,
@@ -40,13 +51,19 @@ from .hierarchical import (
     HierarchicalTriXBlock,
 )
 
-from .multiscale import (
-    MultiScaleTriXFFN,
-    MultiScaleTriXBlock,
-    Octave as MultiScaleOctave,
-    OctaveTile as MultiScaleOctaveTile,
-    MultiScaleRoutingInfo,
+# =============================================================================
+# CORE: Anchored Dual-Mode (Partition First, Search Within)
+# =============================================================================
+
+from .anchored import (
+    AnchoredDualModeFFN,
+    AnchoredDualModeBlock,
+    get_temperature_schedule,
 )
+
+# =============================================================================
+# CORE: TrueOctave (Multi-Resolution Derived Views)
+# =============================================================================
 
 from .octave import (
     TrueOctaveFFN,
@@ -57,84 +74,8 @@ from .octave import (
     OctaveRoutingInfo,
 )
 
-from .sparse_lookup import (
-    SparseLookupFFN,
-    SparseLookupBlock,
-    TernarySpline2D,
-    FloatSpline2D,
-)
-
-from .sparse_lookup_v2 import (
-    SparseLookupFFNv2,
-    SparseLookupBlockV2,
-    ScoreCalibrationSpline,
-)
-
-from .temporal_tiles import (
-    TemporalTileLayer,
-    TemporalTileStack,
-)
-from .compiled_dispatch import (
-    CompiledDispatch,
-    CompiledEntry,
-    ProfileStats,
-)
-
-from .xor_superposition import (
-    SparseDelta,
-    CompressedSignatures,
-    CompressionStats,
-    SuperpositionRouter,
-    XORSuperpositionFFN,
-    create_compressed_ffn,
-    pack_ternary_to_uint8,
-    unpack_uint8_to_ternary,
-    hamming_distance_packed,
-    hamming_distance_batch,
-)
-
 # =============================================================================
-# XOR ROUTING (Providence - Content-Addressable FFN)
-# =============================================================================
-
-from .xor_ffn import (
-    binarize_ste,
-    ternarize_ste,
-    hamming_distance as xor_hamming_distance,
-    soft_hamming_distance,
-    XORRouter,
-    XORRoutingFFN,
-    HierarchicalXORRoutingFFN,
-)
-
-# =============================================================================
-# FROZEN SHAPES LIBRARY (General-Purpose Mathematical Shapes)
-# =============================================================================
-
-from .frozen_shapes import (
-    Primitives,
-    LogicShapes,
-    ComparisonShapes,
-    ActivationShapes,
-    ArithmeticShapes,
-    CompositionShapes,
-    FrozenShapeLibrary,
-    GeneralFrozenTile,
-    get_library as get_frozen_shape_library,
-)
-
-# =============================================================================
-# HIERARCHICAL TEMPORAL (State + O(√n) Routing)
-# =============================================================================
-
-from .hierarchical_temporal import (
-    TemporalTile,
-    HierarchicalTemporalFFN,
-    create_hierarchical_temporal_ffn,
-)
-
-# =============================================================================
-# PROVIDENCE (The Unified Architecture - FFN as Content-Addressable Memory)
+# CORE: Providence (The Unified Architecture)
 # =============================================================================
 
 from .providence import (
@@ -146,7 +87,7 @@ from .providence import (
 )
 
 # =============================================================================
-# GRADIENT TRUTH (Training Beyond STE - Gradients Only Where Uncertain)
+# CORE: Gradient Truth (Training Beyond STE)
 # =============================================================================
 
 from .gradient_truth import (
@@ -163,43 +104,37 @@ from .gradient_truth import (
 )
 
 # =============================================================================
-# KAN (Kolmogorov-Arnold Networks) - Track B
+# ROUTING: XOR (Hamming Distance)
 # =============================================================================
 
-from .additive_kan import (
-    Spline1D,
-    AdditiveKAN,
-    ProductSplineKAN,
-    SharedAdditiveKAN,
-    KANTile as AdditiveKANTile,
-)
-
-from .kan_hierarchical import (
-    KANTile,
-    HierarchicalKANFFN,
+from .xor_ffn import (
+    binarize_ste,
+    ternarize_ste,
+    hamming_distance as xor_hamming_distance,
+    soft_hamming_distance,
+    XORRouter,
+    XORRoutingFFN,
+    HierarchicalXORRoutingFFN,
 )
 
 # =============================================================================
-# SDPMX Pipeline (Vi's Synthesis - Hilbert Space Operators)
+# ROUTING: SparseLookup (Spline-Based)
 # =============================================================================
 
-from .sdpmx_pipeline import (
-    Spline1D as SDPMXSpline1D,
-    SmoothingOperator,
-    DifferentiationOperator,
-    ProjectionOperator,
-    MaskOperator,
-    XOROperator,
-    SDPMXPipeline,
+from .sparse_lookup import (
+    SparseLookupFFN,
+    SparseLookupBlock,
+    TernarySpline2D,
+    FloatSpline2D,
 )
 
 # =============================================================================
-# FROZEN SHAPES (Computation as Geometry)
+# SHAPES: Frozen Computation
 # =============================================================================
 
 from .frozen import (
     FrozenShape,
-    FrozenTile,
+    FrozenTile as FrozenShapeTile,  # Alias to avoid conflict with octave.FrozenTile
     FrozenShapeRegistry,
     FrozenTriXFFN,
     derive_signature,
@@ -207,6 +142,18 @@ from .frozen import (
     get_default_registry,
     create_frozen_ffn_from_names,
     verify_frozen_tile,
+)
+
+from .frozen_shapes import (
+    Primitives,
+    LogicShapes,
+    ComparisonShapes,
+    ActivationShapes,
+    ArithmeticShapes,
+    CompositionShapes,
+    FrozenShapeLibrary,
+    GeneralFrozenTile,
+    get_library as get_frozen_shape_library,
 )
 
 from .frozen_6502 import (
@@ -237,91 +184,188 @@ from .frozen_6502_net import (
 )
 
 # =============================================================================
-# ANCHORED DUAL-MODE (Partition First, Search Within)
+# UTILITY: XOR Superposition (Compression)
 # =============================================================================
 
-from .anchored import (
-    AnchoredDualModeFFN,
-    AnchoredDualModeBlock,
-    get_temperature_schedule,
+from .xor_superposition import (
+    SparseDelta,
+    CompressedSignatures,
+    CompressionStats,
+    SuperpositionRouter,
+    XORSuperpositionFFN,
+    create_compressed_ffn,
+    pack_ternary_to_uint8,
+    unpack_uint8_to_ternary,
+    hamming_distance_packed,
+    hamming_distance_batch,
 )
 
+# =============================================================================
+# UTILITY: Compiled Dispatch
+# =============================================================================
+
+from .compiled_dispatch import (
+    CompiledDispatch,
+    CompiledEntry,
+    ProfileStats,
+)
+
+# =============================================================================
+# UTILITY: Temporal Tiles
+# =============================================================================
+
+from .temporal_tiles import (
+    TemporalTileLayer,
+    TemporalTileStack,
+)
+
+# =============================================================================
+# UTILITY: Hierarchical Temporal
+# =============================================================================
+
+from .hierarchical_temporal import (
+    TemporalTile,
+    HierarchicalTemporalFFN,
+    create_hierarchical_temporal_ffn,
+)
+
+# =============================================================================
+# LEGACY: Layers (Deprecated - kept for compatibility)
+# =============================================================================
+
+from .layers import (
+    Top1Gate,
+    GatedFFN,
+    TriXTransformerBlock,
+)
+
+# =============================================================================
+# RESEARCH: KAN (Track B) - Access via trix.nn.research.kan
+# =============================================================================
+
+from .research.kan import (
+    Spline1D,
+    AdditiveKAN,
+    ProductSplineKAN,
+    SharedAdditiveKAN,
+    AdditiveKANTile,
+    KANTile,
+    HierarchicalKANFFN,
+)
+
+# =============================================================================
+# RESEARCH: SDPMX (Vi's Synthesis) - Access via trix.nn.research.sdpmx
+# =============================================================================
+
+from .research.sdpmx import (
+    SDPMXSpline1D,
+    SmoothingOperator,
+    DifferentiationOperator,
+    ProjectionOperator,
+    MaskOperator,
+    XOROperator,
+    SDPMXPipeline,
+)
+
+# =============================================================================
+# ARCHIVE: Deprecated modules - Access via trix.nn.archive
+# Preserved for reference. See archive/ARCHIVE_INDEX.md
+# =============================================================================
+
+# Lazy imports for archived classes (with deprecation warnings)
+_archived_classes = {
+    "EmergentGatedFFN": ("archive.emergent", "HierarchicalTriXFFN"),
+    "EmergentTransformerBlock": ("archive.emergent", "HierarchicalTriXBlock"),
+    "SparseTriXFFN": ("archive.sparse", "HierarchicalTriXFFN"),
+    "SparseTriXBlock": ("archive.sparse", "HierarchicalTriXBlock"),
+    "SparseLookupFFNv2": ("archive.sparse_lookup_v2", "SparseLookupFFN with use_gradient_truth=True"),
+    "SparseLookupBlockV2": ("archive.sparse_lookup_v2", "SparseLookupBlock"),
+    "ScoreCalibrationSpline": ("archive.sparse_lookup_v2", "TernarySpline2D"),
+    "MultiScaleTriXFFN": ("archive.multiscale", "TrueOctaveFFN"),
+    "MultiScaleTriXBlock": ("archive.multiscale", "TrueOctaveBlock"),
+    "MultiScaleRoutingInfo": ("archive.multiscale", "OctaveRoutingInfo"),
+    "MultiScaleOctave": ("archive.multiscale", "Octave"),
+    "MultiScaleOctaveTile": ("archive.multiscale", "FrozenTile"),
+}
+
+def __getattr__(name):
+    if name in _archived_classes:
+        module_path, replacement = _archived_classes[name]
+        warnings.warn(
+            f"{name} is archived. Use {replacement} instead. "
+            f"See trix.nn.archive.ARCHIVE_INDEX.md for details.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        # Import from archive
+        parts = module_path.split(".")
+        if parts[0] == "archive":
+            from . import archive
+            mod = getattr(archive, parts[1])
+            return getattr(mod, name)
+    raise AttributeError(f"module 'trix.nn' has no attribute '{name}'")
+
+# =============================================================================
+# EXPORTS
+# =============================================================================
+
 __all__ = [
-    # Recommended - emergent routing (zero parameters)
+    # === CORE: Production Architectures ===
+    # Base FFN
     "TriXFFN",
     "TriXBlock",
     "TriXStack",
-    # Sparse training (Option B)
-    "SparseTriXFFN",
-    "SparseTriXBlock",
-    # Hierarchical (The Big Leap - 64+ tiles)
+    # Hierarchical
     "TriXTile",
     "HierarchicalTriXFFN",
     "HierarchicalTriXBlock",
-    # MultiScale (Exact where exact, fuzzy where fuzzy) - scaffold
-    "MultiScaleTriXFFN",
-    "MultiScaleTriXBlock",
-    "MultiScaleRoutingInfo",
-    # TrueOctave (Derived multi-resolution) - the real thing
+    # Anchored
+    "AnchoredDualModeFFN",
+    "AnchoredDualModeBlock",
+    "get_temperature_schedule",
+    # Octave
     "TrueOctaveFFN",
     "TrueOctaveBlock",
     "Octave",
     "FrozenTile",
     "derive_octave",
     "OctaveRoutingInfo",
-    # SparseLookup (Routing IS Computation)
+    # Providence
+    "ProvidenceTile",
+    "ProvidenceFFN",
+    "ProvidenceBlock",
+    "create_providence_ffn",
+    "create_frozen_providence_ffn",
+    # Gradient Truth
+    "Shape",
+    "ShapeBank",
+    "PolynomialShapeBank",
+    "DistilledShapeBank",
+    "GradientTruthFFN",
+    "GradientTruthBlock",
+    "RoutingInfo",
+    "ShapeGenesis",
+    "create_gradient_truth_ffn",
+    "create_gradient_truth_block",
+
+    # === ROUTING ===
+    # XOR Routing
+    "binarize_ste",
+    "ternarize_ste",
+    "xor_hamming_distance",
+    "soft_hamming_distance",
+    "XORRouter",
+    "XORRoutingFFN",
+    "HierarchicalXORRoutingFFN",
+    # SparseLookup
     "SparseLookupFFN",
     "SparseLookupBlock",
     "TernarySpline2D",
     "FloatSpline2D",
-    # SparseLookup v2 (with Surgery + Regularization)
-    "SparseLookupFFNv2",
-    "SparseLookupBlockV2",
-    "ScoreCalibrationSpline",
-    # Compiled Dispatch (Path Compilation)
-    "CompiledDispatch",
-    "CompiledEntry",
-    "ProfileStats",
-    # Temporal Tiles (Mesa 4)
-    "TemporalTileLayer",
-    "TemporalTileStack",
-    # Alternative - learned routing
-    "Top1Gate",
-    "GatedFFN",
-    "TriXTransformerBlock",
-    # Experimental
-    "EmergentGatedFFN",
-    "EmergentTransformerBlock",
-    # XOR Superposition (11.6x compression)
-    "SparseDelta",
-    "CompressedSignatures",
-    "CompressionStats",
-    "SuperpositionRouter",
-    "XORSuperpositionFFN",
-    "create_compressed_ffn",
-    "pack_ternary_to_uint8",
-    "unpack_uint8_to_ternary",
-    "hamming_distance_packed",
-    "hamming_distance_batch",
-    # KAN (Kolmogorov-Arnold Networks) - Track B
-    "Spline1D",
-    "AdditiveKAN",
-    "ProductSplineKAN",
-    "SharedAdditiveKAN",
-    "AdditiveKANTile",
-    "KANTile",
-    "HierarchicalKANFFN",
-    # SDPMX Pipeline (Vi's Synthesis - Hilbert Space Operators)
-    "SDPMXSpline1D",
-    "SmoothingOperator",
-    "DifferentiationOperator",
-    "ProjectionOperator",
-    "MaskOperator",
-    "XOROperator",
-    "SDPMXPipeline",
-    # Frozen Shapes (Computation as Geometry - Mesa 14)
+
+    # === SHAPES (Frozen Computation) ===
     "FrozenShape",
-    "FrozenTile",
+    "FrozenShapeTile",
     "FrozenShapeRegistry",
     "FrozenTriXFFN",
     "derive_signature",
@@ -329,7 +373,17 @@ __all__ = [
     "get_default_registry",
     "create_frozen_ffn_from_names",
     "verify_frozen_tile",
-    # Frozen 6502 (16 shapes for CPU emulation)
+    # Shape Library
+    "Primitives",
+    "LogicShapes",
+    "ComparisonShapes",
+    "ActivationShapes",
+    "ArithmeticShapes",
+    "CompositionShapes",
+    "FrozenShapeLibrary",
+    "GeneralFrozenTile",
+    "get_frozen_shape_library",
+    # 6502
     "ShapeID",
     "RegisterID",
     "PureMath",
@@ -342,7 +396,6 @@ __all__ = [
     "bits_to_int",
     "create_frozen_6502",
     "register_6502_shapes",
-    # Frozen 6502 Net (THE Neural Network That IS a 6502)
     "Frozen6502Net",
     "CPUState",
     "CPUStateWithFlags",
@@ -352,47 +405,63 @@ __all__ = [
     "Reg",
     "get_opcode_id",
     "get_opcode_name",
-    # XOR Routing (Providence - Mesa 15)
-    "binarize_ste",
-    "ternarize_ste",
-    "xor_hamming_distance",
-    "soft_hamming_distance",
-    "XORRouter",
-    "XORRoutingFFN",
-    "HierarchicalXORRoutingFFN",
-    # Frozen Shapes Library (General-Purpose)
-    "Primitives",
-    "LogicShapes",
-    "ComparisonShapes",
-    "ActivationShapes",
-    "ArithmeticShapes",
-    "CompositionShapes",
-    "FrozenShapeLibrary",
-    "GeneralFrozenTile",
-    "get_frozen_shape_library",
-    # Hierarchical Temporal (State + O(√n) Routing - Mesa 15)
+
+    # === UTILITY ===
+    # Compression
+    "SparseDelta",
+    "CompressedSignatures",
+    "CompressionStats",
+    "SuperpositionRouter",
+    "XORSuperpositionFFN",
+    "create_compressed_ffn",
+    "pack_ternary_to_uint8",
+    "unpack_uint8_to_ternary",
+    "hamming_distance_packed",
+    "hamming_distance_batch",
+    # Compiled Dispatch
+    "CompiledDispatch",
+    "CompiledEntry",
+    "ProfileStats",
+    # Temporal
+    "TemporalTileLayer",
+    "TemporalTileStack",
     "TemporalTile",
     "HierarchicalTemporalFFN",
     "create_hierarchical_temporal_ffn",
-    # Providence (The Unified Architecture - Mesa 15)
-    "ProvidenceTile",
-    "ProvidenceFFN",
-    "ProvidenceBlock",
-    "create_providence_ffn",
-    "create_frozen_providence_ffn",
-    # Gradient Truth (Training Beyond STE)
-    "Shape",
-    "ShapeBank",
-    "PolynomialShapeBank",
-    "DistilledShapeBank",
-    "GradientTruthFFN",
-    "GradientTruthBlock",
-    "RoutingInfo",
-    "ShapeGenesis",
-    "create_gradient_truth_ffn",
-    "create_gradient_truth_block",
-    # Anchored Dual-Mode (Partition First, Search Within)
-    "AnchoredDualModeFFN",
-    "AnchoredDualModeBlock",
-    "get_temperature_schedule",
+
+    # === LEGACY (Deprecated) ===
+    "Top1Gate",
+    "GatedFFN",
+    "TriXTransformerBlock",
+
+    # === RESEARCH ===
+    # KAN (Track B)
+    "Spline1D",
+    "AdditiveKAN",
+    "ProductSplineKAN",
+    "SharedAdditiveKAN",
+    "AdditiveKANTile",
+    "KANTile",
+    "HierarchicalKANFFN",
+    # SDPMX
+    "SDPMXSpline1D",
+    "SmoothingOperator",
+    "DifferentiationOperator",
+    "ProjectionOperator",
+    "MaskOperator",
+    "XOROperator",
+    "SDPMXPipeline",
+
+    # === ARCHIVE (Deprecated - lazy loaded with warnings) ===
+    # These will emit deprecation warnings when accessed
+    "EmergentGatedFFN",
+    "EmergentTransformerBlock",
+    "SparseTriXFFN",
+    "SparseTriXBlock",
+    "SparseLookupFFNv2",
+    "SparseLookupBlockV2",
+    "ScoreCalibrationSpline",
+    "MultiScaleTriXFFN",
+    "MultiScaleTriXBlock",
+    "MultiScaleRoutingInfo",
 ]

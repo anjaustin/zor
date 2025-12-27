@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple, List
 
-from .frozen_shapes import ActivationShapes
+from trix.nn.frozen_shapes import ActivationShapes
 
 # Lazy imports to avoid deprecation warning on module load
 _TriXLinear = None
@@ -26,7 +26,7 @@ def _load_kernel():
         return
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
-        from ..kernel import TriXLinear, STESign
+        from trix.kernel import TriXLinear, STESign
     _TriXLinear = TriXLinear
     _STESign = STESign
 
