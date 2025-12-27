@@ -98,6 +98,14 @@ class OctaveIndex:
         self.documents: Dict[str, Document] = {}
         self.coarse_buckets: Dict[tuple, List[str]] = defaultdict(list)
         
+        # Vectorized storage for fast batch operations
+        self._doc_ids: List[str] = []
+        self._coarse_matrix: Optional[np.ndarray] = None
+        self._medium_matrix: Optional[np.ndarray] = None
+        self._fine_matrix: Optional[np.ndarray] = None
+        self._mag_matrix: Optional[np.ndarray] = None
+        self._index_dirty = True
+        
         # Stats
         self.num_documents = 0
     
@@ -164,6 +172,32 @@ class OctaveIndex:
         self.coarse_buckets[key].append(doc_id)
         
         self.num_documents += 1
+        self._index_dirty = True
+    
+    def _rebuild_matrices(self):
+        """Rebuild vectorized matrices for fast batch operations."""
+        if not self._index_dirty or self.num_documents == 0:
+            return
+        
+        self._doc_ids = list(self.documents.keys())
+        n = len(self._doc_ids)
+        
+        # Get dimensions from first doc
+        first_doc = self.documents[self._doc_ids[0]]
+        
+        self._coarse_matrix = np.zeros((n, len(first_doc.coarse)), dtype=np.int8)
+        self._medium_matrix = np.zeros((n, len(first_doc.medium)), dtype=np.int8)
+        self._fine_matrix = np.zeros((n, len(first_doc.fine)), dtype=np.int8)
+        self._mag_matrix = np.zeros((n, len(first_doc.magnitudes)), dtype=np.float32)
+        
+        for i, doc_id in enumerate(self._doc_ids):
+            doc = self.documents[doc_id]
+            self._coarse_matrix[i] = doc.coarse
+            self._medium_matrix[i] = doc.medium
+            self._fine_matrix[i] = doc.fine
+            self._mag_matrix[i] = doc.magnitudes
+        
+        self._index_dirty = False
     
     def add_batch(
         self,
@@ -251,84 +285,100 @@ class OctaveIndex:
         # φ = 1.618... - the spiral to convergence
         PHI = 1.6180339887
         
+        # Minimum funnel sizes to ensure self-retrieval works
+        MIN_OC2 = 50  # Never filter more than this at coarse
+        MIN_OC1 = 20  # Never filter more than this at medium
+        
         if mode == "context":
             oc2_keep = self.num_documents  # Keep all at coarse
             oc1_keep = self.num_documents  # Keep all at medium
         elif mode == "exact":
-            # Tight spiral: φ^2 and φ from top_k
-            oc1_keep = max(int(top_k * PHI), top_k + 1)
-            oc2_keep = max(int(oc1_keep * PHI), oc1_keep + 1)
+            # Tight spiral: φ^2 and φ from top_k, with minimums
+            oc1_keep = max(int(top_k * PHI), MIN_OC1)
+            oc2_keep = max(int(oc1_keep * PHI), MIN_OC2)
         else:  # similar
-            # Balanced spiral: φ^3 and φ^2 from top_k
-            oc1_keep = max(int(top_k * PHI * PHI), top_k + 2)
-            oc2_keep = max(int(oc1_keep * PHI), oc1_keep + 1)
+            # Balanced spiral: φ^3 and φ^2 from top_k, with minimums
+            oc1_keep = max(int(top_k * PHI * PHI), MIN_OC1)
+            oc2_keep = max(int(oc1_keep * PHI), MIN_OC2)
         
-        # Normalization factors
+        # Rebuild vectorized matrices if needed
+        self._rebuild_matrices()
+        
+        if self.num_documents == 0:
+            return []
+        
+        # ═══════════════════════════════════════════════════════════════
+        # VECTORIZED CASCADE: All octave levels computed in batch
+        # ═══════════════════════════════════════════════════════════════
+        
+        # Oc2: Coarse scores (all docs)
+        coarse_scores = np.sum(query_coarse * self._coarse_matrix, axis=1).astype(np.float32)
         coarse_norm = max(np.sum(np.abs(query_coarse)), 1)
-        medium_norm = max(np.sum(np.abs(query_medium)), 1)
+        coarse_scores = coarse_scores / coarse_norm
         
-        # ═══════════════════════════════════════════════════════════════
-        # Oc2 (COARSE): Fuzzy, fastest - broad candidates
-        # ═══════════════════════════════════════════════════════════════
-        oc2_candidates = []
-        for doc_id, doc in self.documents.items():
-            coarse_score = ternary_similarity(query_coarse, doc.coarse) / coarse_norm
-            oc2_candidates.append((doc_id, coarse_score))
-        
-        # Sort by coarse score, keep top candidates
-        oc2_candidates.sort(key=lambda x: -x[1])
-        oc2_candidates = oc2_candidates[:oc2_keep]
+        # Get top oc2_keep by coarse score
+        oc2_indices = np.argsort(coarse_scores)[::-1][:oc2_keep]
         
         # If context mode, return coarse results directly
         if mode == "context":
             results = []
-            for doc_id, coarse_score in oc2_candidates[:top_k]:
+            for idx in oc2_indices[:top_k]:
+                doc_id = self._doc_ids[idx]
                 doc = self.documents[doc_id]
                 results.append(SearchResult(
                     id=doc_id,
-                    score=coarse_score,
-                    level_scores={'coarse': coarse_score, 'medium': 0.0, 'fine': 0.0},
+                    score=float(coarse_scores[idx]),
+                    level_scores={'coarse': float(coarse_scores[idx]), 'medium': 0.0, 'fine': 0.0},
                     metadata=doc.metadata,
                     explanation=explain_match(query_coarse, doc.coarse) if explain else None,
                 ))
             return results
         
-        # ═══════════════════════════════════════════════════════════════
-        # Oc1 (MEDIUM): More convergence, faster - narrow down
-        # ═══════════════════════════════════════════════════════════════
-        oc1_candidates = []
-        for doc_id, coarse_score in oc2_candidates:
-            doc = self.documents[doc_id]
-            medium_score = ternary_similarity(query_medium, doc.medium) / medium_norm
-            oc1_candidates.append((doc_id, coarse_score, medium_score))
+        # Oc1: Medium scores (filtered candidates)
+        medium_subset = self._medium_matrix[oc2_indices]
+        medium_scores = np.sum(query_medium * medium_subset, axis=1).astype(np.float32)
+        medium_norm = max(np.sum(np.abs(query_medium)), 1)
+        medium_scores = medium_scores / medium_norm
         
-        # Sort by medium score, keep top candidates
-        oc1_candidates.sort(key=lambda x: -x[2])
-        oc1_candidates = oc1_candidates[:oc1_keep]
+        # Get top oc1_keep by medium score
+        oc1_local_indices = np.argsort(medium_scores)[::-1][:oc1_keep]
+        oc1_indices = oc2_indices[oc1_local_indices]
+        oc1_coarse_scores = coarse_scores[oc1_indices]
+        oc1_medium_scores = medium_scores[oc1_local_indices]
         
         # ═══════════════════════════════════════════════════════════════
         # Oc0 (FINE): Near-exact convergence - final ranking
-        # Uses SECRET SAUCE (magnitude-weighted similarity)
+        # Uses SECRET SAUCE (magnitude-weighted similarity) - VECTORIZED
         # ═══════════════════════════════════════════════════════════════
+        if len(oc1_indices) == 0:
+            return []
+        
+        # Get fine and magnitude data for Oc1 candidates
+        candidate_signs = self._fine_matrix[oc1_indices]
+        candidate_mags = self._mag_matrix[oc1_indices]
+        
+        # VECTORIZED SECRET SAUCE
+        # weights[i, d] = sqrt(q_mags[d] * candidate_mags[i, d])
+        weights = np.sqrt(query_magnitudes * candidate_mags)
+        # sign_product[i, d] = q_signs[d] * candidate_signs[i, d]
+        sign_product = query_fine * candidate_signs
+        # octave_scores[i] = sum over d
+        octave_scores = np.sum(weights * sign_product, axis=1)
+        # max_scores[i] for normalization
+        max_scores = np.sum(weights, axis=1)
+        # Avoid division by zero
+        fine_scores = np.divide(octave_scores, max_scores, 
+                                out=np.zeros_like(octave_scores), 
+                                where=max_scores > 0)
+        
+        # Build results
         oc0_results = []
-        for doc_id, coarse_score, medium_score in oc1_candidates:
-            doc = self.documents[doc_id]
-            
-            # THE SECRET SAUCE: magnitude-weighted similarity
-            octave_score = octave_similarity(
-                query_fine, query_magnitudes,
-                doc.fine, doc.magnitudes
-            )
-            
-            # Normalize by max possible score
-            max_score = np.sum(np.sqrt(query_magnitudes * doc.magnitudes))
-            fine_score = octave_score / max_score if max_score > 0 else 0.0
-            
-            # Final score is fine score (the others were just for filtering)
-            oc0_results.append((doc_id, fine_score, {
-                'fine': fine_score,
-                'medium': medium_score,
-                'coarse': coarse_score,
+        for i, idx in enumerate(oc1_indices):
+            doc_id = self._doc_ids[idx]
+            oc0_results.append((doc_id, float(fine_scores[i]), {
+                'fine': float(fine_scores[i]),
+                'medium': float(oc1_medium_scores[i]),
+                'coarse': float(oc1_coarse_scores[i]),
             }))
         
         # Sort by fine score (the final word)
