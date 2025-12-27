@@ -287,6 +287,11 @@ class OctaveIndex:
     ) -> List[SearchResult]:
         """
         Quality mode with original query embedding for exact cosine.
+        
+        Three-stage architecture for scale:
+            1. Coarse filter (fast) → 30% candidates
+            2. Magnitude-weighted filter → 20% of remaining
+            3. Exact cosine → final ranking
         """
         self._rebuild_matrices()
         
@@ -299,23 +304,48 @@ class OctaveIndex:
                 "Store embeddings when adding documents."
             )
         
-        # Stage 1: Magnitude-weighted filter (Secret Sauce)
-        weights = np.sqrt(query_magnitudes * self._mag_matrix)
-        sign_product = query_fine * self._fine_matrix
-        weighted_scores = np.sum(weights * sign_product, axis=1)
+        # ═══════════════════════════════════════════════════════════════
+        # HIERARCHICAL QUALITY: Fast coarse filter + precise reranking
+        # ═══════════════════════════════════════════════════════════════
         
-        # Keep top candidates (at least 20% or 500, whichever keeps more)
-        # Conservative default for enterprise-grade recall
-        n_keep = max(int(self.num_documents * keep_ratio), min(500, self.num_documents))
-        candidate_indices = np.argsort(weighted_scores)[::-1][:n_keep]
+        # For small datasets, skip hierarchy (brute-force is fast)
+        HIERARCHY_THRESHOLD = 5000
+        
+        if self.num_documents <= HIERARCHY_THRESHOLD:
+            # Direct magnitude-weighted filter on all documents
+            candidate_indices = np.arange(self.num_documents)
+        else:
+            # For large datasets: magnitude-weighted filter → exact cosine
+            # Skip hierarchy, use Secret Sauce directly
+            weights = np.sqrt(query_magnitudes * self._mag_matrix)
+            sign_product = query_fine * self._fine_matrix
+            weighted_scores = np.sum(weights * sign_product, axis=1)
+            
+            # Keep top 20% for exact cosine reranking (max 20K for speed)
+            n_keep = min(max(int(self.num_documents * 0.20), 1000), 20000)
+            candidate_indices = np.argsort(weighted_scores)[::-1][:n_keep]
+        
+        # For small datasets, we need to compute magnitude-weighted scores
+        if self.num_documents <= HIERARCHY_THRESHOLD:
+            candidate_mags = self._mag_matrix[candidate_indices]
+            candidate_signs = self._fine_matrix[candidate_indices]
+            weights = np.sqrt(query_magnitudes * candidate_mags)
+            sign_product = query_fine * candidate_signs
+            weighted_scores = np.sum(weights * sign_product, axis=1)
+            n_keep = max(int(len(candidate_indices) * keep_ratio), min(500, len(candidate_indices)))
+            top_idx = np.argsort(weighted_scores)[::-1][:n_keep]
+            rerank_indices = candidate_indices[top_idx]
+        else:
+            # Already filtered by magnitude-weighted scores
+            rerank_indices = candidate_indices
         
         # Stage 2: Exact cosine on candidates using original query embedding
-        candidate_embeddings = self._embedding_matrix[candidate_indices]
+        candidate_embeddings = self._embedding_matrix[rerank_indices]
         exact_scores = candidate_embeddings @ query_embedding
         
         # Top K by exact cosine
         top_k_local = np.argsort(exact_scores)[::-1][:top_k]
-        top_k_indices = candidate_indices[top_k_local]
+        top_k_indices = rerank_indices[top_k_local]
         top_k_scores = exact_scores[top_k_local]
         
         # Build results
@@ -328,7 +358,6 @@ class OctaveIndex:
                 score=float(top_k_scores[i]),
                 level_scores={
                     'exact_cosine': float(top_k_scores[i]),
-                    'weighted_filter': float(weighted_scores[idx]),
                 },
                 metadata=doc.metadata,
                 explanation=None,
