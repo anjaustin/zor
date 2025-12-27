@@ -9,7 +9,7 @@ import numpy as np
 from typing import List, Optional, Union, Callable
 from dataclasses import dataclass
 
-from .core import ternary_quantize, derive_hierarchy, explain_match
+from .core import ternary_quantize, derive_hierarchy, explain_match, octave_quantize
 from .index import OctaveIndex, SearchResult
 
 
@@ -91,12 +91,21 @@ class OctaveDB:
         self._float_cache: dict = {}
     
     def _to_ternary(self, embedding: np.ndarray) -> np.ndarray:
-        """Convert float embedding to ternary."""
+        """Convert float embedding to ternary (legacy)."""
         return ternary_quantize(
             embedding,
             threshold=self.config.quantize_threshold,
             sparsity_target=self.config.quantize_sparsity,
         )
+    
+    def _to_octave(self, embedding: np.ndarray):
+        """
+        Convert float embedding to octave representation.
+        
+        Returns:
+            (signs, magnitudes) - The Secret Sauce representation.
+        """
+        return octave_quantize(embedding)
     
     def _embed(self, text: str) -> np.ndarray:
         """Embed text to float array."""
@@ -118,23 +127,26 @@ class OctaveDB:
             doc_id: Unique document identifier
             embedding: Float embedding array OR text (if embedder configured)
             metadata: Optional metadata dict
-            is_ternary: If True, embedding is already ternary
+            is_ternary: If True, embedding is already ternary (legacy)
         """
         # Handle text input
         if isinstance(embedding, str):
             embedding = self._embed(embedding)
             is_ternary = False
         
-        embedding = np.asarray(embedding)
+        embedding = np.asarray(embedding, dtype=np.float32)
         
-        # Quantize if needed
+        # Quantize to octave representation (Secret Sauce)
         if is_ternary:
-            ternary = embedding.astype(np.int8)
+            # Legacy: ternary without magnitudes
+            signs = embedding.astype(np.int8)
+            magnitudes = np.ones(len(signs), dtype=np.float32)
         else:
-            ternary = self._to_ternary(embedding)
+            # The Secret Sauce: keep both signs AND magnitudes
+            signs, magnitudes = self._to_octave(embedding)
         
-        # Add to index
-        self.index.add(doc_id, ternary, metadata=metadata)
+        # Add to index with magnitudes
+        self.index.add(doc_id, signs, magnitudes=magnitudes, metadata=metadata)
     
     def add_batch(
         self,
@@ -149,16 +161,14 @@ class OctaveDB:
             embeddings = np.array([self._embed(t) for t in embeddings])
             is_ternary = False
         
-        embeddings = np.asarray(embeddings)
+        embeddings = np.asarray(embeddings, dtype=np.float32)
         
-        # Quantize if needed
-        if is_ternary:
-            ternary = embeddings.astype(np.int8)
-        else:
-            ternary = self._to_ternary(embeddings)
+        if metadata_list is None:
+            metadata_list = [None] * len(doc_ids)
         
-        # Add to index
-        self.index.add_batch(doc_ids, ternary, metadata_list)
+        # Add each with octave quantization
+        for doc_id, emb, meta in zip(doc_ids, embeddings, metadata_list):
+            self.add(doc_id, emb, metadata=meta, is_ternary=is_ternary)
     
     def remove(self, doc_id: str) -> bool:
         """Remove document from database."""
@@ -173,7 +183,7 @@ class OctaveDB:
         is_ternary: bool = False,
     ) -> List[SearchResult]:
         """
-        Search database.
+        Search database with magnitude-weighted similarity (Secret Sauce).
         
         Args:
             query: Query embedding OR text (if embedder configured)
@@ -183,7 +193,7 @@ class OctaveDB:
                 - "context": Coarse-level matching, broad discovery
             top_k: Number of results
             explain: Include per-dimension explanations
-            is_ternary: If True, query is already ternary
+            is_ternary: If True, query is already ternary (legacy)
         
         Returns:
             List of SearchResult with scores and optional explanations
@@ -193,17 +203,19 @@ class OctaveDB:
             query = self._embed(query)
             is_ternary = False
         
-        query = np.asarray(query)
+        query = np.asarray(query, dtype=np.float32)
         
-        # Quantize if needed
+        # Quantize to octave representation
         if is_ternary:
-            query_ternary = query.astype(np.int8)
+            query_signs = query.astype(np.int8)
+            query_magnitudes = np.ones(len(query_signs), dtype=np.float32)
         else:
-            query_ternary = self._to_ternary(query)
+            query_signs, query_magnitudes = self._to_octave(query)
         
-        # Search
+        # Search with Secret Sauce (magnitude-weighted)
         return self.index.search(
-            query_ternary,
+            query_signs,
+            query_magnitudes=query_magnitudes,
             mode=mode,
             top_k=top_k,
             explain=explain,
@@ -221,7 +233,7 @@ class OctaveDB:
         Args:
             query: Query embedding or text
             doc_id: Document ID to explain
-            is_ternary: If True, query is already ternary
+            is_ternary: If True, query is already ternary (legacy)
         
         Returns:
             Explanation dict with agreement/conflict dimensions
@@ -235,15 +247,15 @@ class OctaveDB:
             query = self._embed(query)
             is_ternary = False
         
-        query = np.asarray(query)
+        query = np.asarray(query, dtype=np.float32)
         
-        # Quantize if needed
+        # Quantize to octave representation
         if is_ternary:
-            query_ternary = query.astype(np.int8)
+            query_signs = query.astype(np.int8)
         else:
-            query_ternary = self._to_ternary(query)
+            query_signs, _ = self._to_octave(query)
         
-        return explain_match(query_ternary, doc.fine)
+        return explain_match(query_signs, doc.fine)
     
     def get(self, doc_id: str) -> Optional[dict]:
         """Get document by ID."""

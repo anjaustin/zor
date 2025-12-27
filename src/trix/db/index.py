@@ -3,6 +3,9 @@ DB Cooper: OctaveIndex - Hierarchical ternary index.
 
 Coarse buckets for fast filtering, fine signatures for precise ranking.
 NEON-accelerated when native ops are available.
+
+The Secret Sauce: Magnitude-weighted similarity.
+Sign tells direction. Magnitude tells importance.
 """
 
 import numpy as np
@@ -15,6 +18,9 @@ from .core import (
     derive_hierarchy,
     pack_ternary,
     explain_match,
+    octave_quantize,
+    octave_similarity,
+    octave_similarity_batch,
 )
 
 # Try to import native ops
@@ -29,9 +35,10 @@ except Exception:
 class Document:
     """Stored document with octave signatures."""
     id: str
-    fine: np.ndarray
+    fine: np.ndarray       # Signs {-1, 0, +1}
     medium: np.ndarray
     coarse: np.ndarray
+    magnitudes: np.ndarray  # The Secret Sauce: magnitude weights
     metadata: Optional[dict] = None
     
     # Packed representations for fast similarity
@@ -104,6 +111,7 @@ class OctaveIndex:
         fine: np.ndarray,
         medium: Optional[np.ndarray] = None,
         coarse: Optional[np.ndarray] = None,
+        magnitudes: Optional[np.ndarray] = None,
         metadata: Optional[dict] = None,
     ) -> None:
         """
@@ -111,9 +119,10 @@ class OctaveIndex:
         
         Args:
             doc_id: Unique document identifier
-            fine: Fine ternary signature [D]
+            fine: Fine ternary signature [D] (signs)
             medium: Medium signature (derived if not provided)
             coarse: Coarse signature (derived if not provided)
+            magnitudes: Magnitude weights (for Secret Sauce similarity)
             metadata: Optional document metadata
         """
         fine = np.asarray(fine, dtype=np.int8)
@@ -126,6 +135,12 @@ class OctaveIndex:
             medium = np.asarray(medium, dtype=np.int8)
             coarse = np.asarray(coarse, dtype=np.int8)
         
+        # Default magnitudes to uniform if not provided (backward compat)
+        if magnitudes is None:
+            magnitudes = np.ones(len(fine), dtype=np.float32)
+        else:
+            magnitudes = np.asarray(magnitudes, dtype=np.float32)
+        
         # Pack for fast similarity
         fine_pos, fine_neg = pack_ternary(fine)
         
@@ -135,6 +150,7 @@ class OctaveIndex:
             fine=fine,
             medium=medium,
             coarse=coarse,
+            magnitudes=magnitudes,
             metadata=metadata,
             fine_pos=fine_pos,
             fine_neg=fine_neg,
@@ -187,6 +203,7 @@ class OctaveIndex:
         query_fine: np.ndarray,
         query_medium: Optional[np.ndarray] = None,
         query_coarse: Optional[np.ndarray] = None,
+        query_magnitudes: Optional[np.ndarray] = None,
         mode: str = "similar",
         top_k: int = 10,
         explain: bool = False,
@@ -194,10 +211,13 @@ class OctaveIndex:
         """
         Search index with multi-resolution filtering.
         
+        Uses magnitude-weighted similarity (Secret Sauce) for fine ranking.
+        
         Args:
-            query_fine: Fine query signature
+            query_fine: Fine query signature (signs)
             query_medium: Medium signature (derived if not provided)
             query_coarse: Coarse signature (derived if not provided)
+            query_magnitudes: Query magnitude weights (for Secret Sauce)
             mode: "exact" | "similar" | "context"
                 - exact: strict fine-level matching
                 - similar: balanced multi-level
@@ -217,6 +237,12 @@ class OctaveIndex:
         else:
             query_medium = np.asarray(query_medium, dtype=np.int8)
             query_coarse = np.asarray(query_coarse, dtype=np.int8)
+        
+        # Default query magnitudes to uniform if not provided
+        if query_magnitudes is None:
+            query_magnitudes = np.ones(len(query_fine), dtype=np.float32)
+        else:
+            query_magnitudes = np.asarray(query_magnitudes, dtype=np.float32)
         
         # Normalization factors
         fine_norm = max(np.sum(np.abs(query_fine)), 1)
@@ -259,11 +285,20 @@ class OctaveIndex:
         scored.sort(key=lambda x: -x[2])
         scored = scored[:min(len(scored), top_k * 10)]
         
-        # Phase 3: Fine reranking
+        # Phase 3: Fine reranking with SECRET SAUCE (magnitude-weighted)
         final = []
         for doc_id, coarse_score, medium_score in scored:
             doc = self.documents[doc_id]
-            fine_score = ternary_similarity(query_fine, doc.fine) / fine_norm
+            
+            # THE SECRET SAUCE: magnitude-weighted similarity
+            octave_score = octave_similarity(
+                query_fine, query_magnitudes,
+                doc.fine, doc.magnitudes
+            )
+            
+            # Normalize by max possible score
+            max_score = np.sum(np.sqrt(query_magnitudes * doc.magnitudes))
+            fine_score = octave_score / max_score if max_score > 0 else 0.0
             
             # Combined score (weighted by mode)
             if mode == "exact":
