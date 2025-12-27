@@ -67,6 +67,21 @@ from trix.nn.archive.sparse_lookup_v4 import SparseLookupFFNv4
 from trix.nn.archive.multiscale import MultiScaleTriXFFN, MultiScaleTriXBlock, OctaveTile
 ```
 
+### 6. hierarchical_temporal.py (558 lines)
+**Original purpose:** HierarchicalTemporalFFN - O(√n) Routing with Persistent State
+**Why archived:** Fully superseded by ProvidenceFFN (the unified architecture)
+**Superseded by:** ProvidenceFFN in providence.py
+**Gold extracted:**
+- O(√n) hierarchical routing → now in ProvidenceFFN
+- State persistence per tile → now in ProvidenceTile
+- State-aware signatures → now in ProvidenceTile.get_combined_signature
+- State update network → now in ProvidenceTile.state_update
+
+```python
+# To access archived module:
+from trix.nn.archive.hierarchical_temporal import HierarchicalTemporalFFN, TemporalTile
+```
+
 ---
 
 ## Why These Were Archived (Not Deleted)

@@ -16,6 +16,7 @@ from . import sparse
 from . import sparse_lookup_v2
 from . import sparse_lookup_v4
 from . import multiscale
+from . import hierarchical_temporal
 
 __all__ = [
     "emergent",
@@ -23,4 +24,5 @@ __all__ = [
     "sparse_lookup_v2",
     "sparse_lookup_v4",
     "multiscale",
+    "hierarchical_temporal",
 ]

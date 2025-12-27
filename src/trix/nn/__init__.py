@@ -220,14 +220,11 @@ from .temporal_tiles import (
 )
 
 # =============================================================================
-# UTILITY: Hierarchical Temporal
+# UTILITY: Hierarchical Temporal (ARCHIVED - superseded by Providence)
 # =============================================================================
 
-from .hierarchical_temporal import (
-    TemporalTile,
-    HierarchicalTemporalFFN,
-    create_hierarchical_temporal_ffn,
-)
+# Lazy import from archive with deprecation warning
+# from .archive.hierarchical_temporal import TemporalTile, HierarchicalTemporalFFN
 
 # =============================================================================
 # LEGACY: Layers (Deprecated - kept for compatibility)
@@ -286,6 +283,9 @@ _archived_classes = {
     "MultiScaleRoutingInfo": ("archive.multiscale", "OctaveRoutingInfo"),
     "MultiScaleOctave": ("archive.multiscale", "Octave"),
     "MultiScaleOctaveTile": ("archive.multiscale", "FrozenTile"),
+    "HierarchicalTemporalFFN": ("archive.hierarchical_temporal", "ProvidenceFFN"),
+    "TemporalTile": ("archive.hierarchical_temporal", "ProvidenceTile"),
+    "create_hierarchical_temporal_ffn": ("archive.hierarchical_temporal", "create_providence_ffn"),
 }
 
 def __getattr__(name):
@@ -422,12 +422,9 @@ __all__ = [
     "CompiledDispatch",
     "CompiledEntry",
     "ProfileStats",
-    # Temporal
+    # Temporal (basic)
     "TemporalTileLayer",
     "TemporalTileStack",
-    "TemporalTile",
-    "HierarchicalTemporalFFN",
-    "create_hierarchical_temporal_ffn",
 
     # === LEGACY (Deprecated) ===
     "Top1Gate",
@@ -464,4 +461,7 @@ __all__ = [
     "MultiScaleTriXFFN",
     "MultiScaleTriXBlock",
     "MultiScaleRoutingInfo",
+    "HierarchicalTemporalFFN",
+    "TemporalTile",
+    "create_hierarchical_temporal_ffn",
 ]
