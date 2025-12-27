@@ -306,6 +306,26 @@ If synthesis reveals gaps, return to earlier phases. This isn't failure; it's th
 
 You're not constructing understanding; you're creating conditions for it to emerge. The nodes exist whether you see them or not. Reflection reveals; it doesn't create.
 
+### 6. The Laundry Method
+
+*Partition first. Search within.*
+
+When doing laundry, you don't search the whole pile for one sock. You:
+1. Divide by type (socks, shirts, pants) — **coarse buckets**
+2. Within the sock pile, divide by kind (ankle, crew, dress) — **narrow within**
+3. Pick the exact sock you need — **fine selection**
+4. That weird sock that looks like a rag? Check it carefully — **the delta**
+
+Apply this to the Manifold:
+- **RAW** dumps the whole pile
+- **NODES** partitions into buckets (the types)
+- **REFLECT** examines within buckets, checks the boundaries
+- **SYNTHESIZE** picks the exact answer
+
+The delta — items at bucket boundaries — are where mistakes hide. The sock that could be underwear. The insight that could be two different things. These need extra attention.
+
+**Don't search the whole pile. Partition first.**
+
 ---
 
 ## Anti-Patterns
@@ -409,6 +429,8 @@ We didn't optimize. We understood.
 │  • Separate thinking from building                           │
 │  • Iteration is honor                                        │
 │  • The wood cuts itself when you understand the grain        │
+│  • Partition first, search within (The Laundry Method)       │
+│  • The delta is where mistakes hide — check the boundaries   │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
