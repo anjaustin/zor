@@ -1,6 +1,8 @@
-# Frozen 6502 Standalone C Implementation
+# Frozen 6502 ALU - Standalone C Implementation
 
-A complete 6502 ALU emulator in minimal C. Zero dependencies. 1.5KB executable.
+The 6502 **ALU (Arithmetic Logic Unit)** in minimal C. Zero dependencies. 1.5KB executable.
+
+> **Note**: This is the ALU only - the 16 frozen computation shapes. For a complete 6502 CPU emulator with all 256 opcodes, addressing modes, memory, and stack, see `frozen_6502_complete.c`.
 
 ## Quick Start
 
