@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trix-ingest"
+version = "0.1.0"
+description = "Import Verilog designs as deterministic neural networks"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Tripp Josserand-Austin", email = "tripp@example.com"}
+]
+keywords = [
+    "verilog",
+    "yosys",
+    "neural-network",
+    "deterministic",
+    "hardware",
+    "emulation",
+    "eda"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Electronic Design Automation (Verilog)",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.20.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+native = [
+    "trix-core>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/anjaustin/zor"
+Documentation = "https://github.com/anjaustin/zor/blob/main/docs/INGEST.md"
+Repository = "https://github.com/anjaustin/zor"
+Issues = "https://github.com/anjaustin/zor/issues"
+
+[project.scripts]
+trix-ingest = "trix_ingest.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+trix_ingest = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"

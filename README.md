@@ -1,6 +1,9 @@
 # TriX
 
-**Ternary neural computation. Self-hosted. No dependencies.**
+[![CI](https://github.com/anjaustin/zor/actions/workflows/ci.yml/badge.svg)](https://github.com/anjaustin/zor/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+**Deterministic neural computation. Self-hosted. No dependencies.**
 
 ```
 Weights are {-1, 0, +1}. Shapes are frozen polynomials. Gradients are real.
@@ -28,6 +31,34 @@ y = Σ(x where w=+1) - Σ(x where w=-1)
 ```
 
 Just addition. Just routing.
+
+---
+
+## Start Here
+
+| Path | Time | What You Get |
+|------|------|--------------|
+| **[Quickstart](QUICKSTART.md)** | 5 min | Three paths to value |
+| **[Pure C](trixc/)** | 5 min | Zero dependencies, 6 KB binary |
+| **[Import Verilog](docs/INGEST.md)** | 10 min | Any design as neural net |
+| **[Guided Journey](onramp/)** | 75 min | Zero to mastery, Python |
+| **[Why TriX?](docs/WHY_TRIX.md)** | 5 min | Should you care? |
+
+### Fastest Start (Pure C)
+
+```bash
+cd trixc && make demo
+```
+
+A complete 6502 ALU in 6 KB. No Python. No PyTorch. No runtime.
+
+### Guided Start (Python)
+
+```bash
+python onramp/00_witness.py
+```
+
+Watch the 6502 run. Then follow the path.
 
 ---
 
@@ -124,6 +155,32 @@ a_bin = ops.binarize(a)
 b_bin = ops.binarize(b)
 result = ops.apply_binary_xor(a_bin, b_bin)  # 117 GB/s
 ```
+
+---
+
+## Design Import (Ingest)
+
+Import any combinational Verilog design as a deterministic neural network.
+
+```
+Verilog RTL -> [Yosys] -> JSON Netlist -> [TriX Ingest] -> Executable System
+```
+
+```bash
+# 1. Synthesize with Yosys
+yosys -p "read_verilog adder.v; synth; write_json adder.json"
+
+# 2. Import and run
+python -c "
+from trix.forge.ingest import ingest_yosys_json, execute
+system = ingest_yosys_json('adder.json')
+print(execute(system, {'a': 5, 'b': 3, 'cin': 0}))
+"
+```
+
+**Validated:** 8-bit adder (52 gates, 131K test cases, 100% pass)
+
+See [INGEST.md](docs/INGEST.md) for complete documentation.
 
 ---
 
@@ -339,6 +396,11 @@ See [TESTING.md](docs/TESTING.md) for detailed documentation.
 
 | Document | Description |
 |----------|-------------|
+| [QUICKSTART.md](QUICKSTART.md) | 5-minute path to value |
+| [INGEST.md](docs/INGEST.md) | Verilog import pipeline |
+| [GETTING_STARTED.md](docs/GETTING_STARTED.md) | From understanding to action |
+| [WHY_TRIX.md](docs/WHY_TRIX.md) | Should you care? |
+| [PURE_TRIX.md](docs/PURE_TRIX.md) | Zero-dependency guide |
 | [THE_WAY.md](docs/THE_WAY.md) | Philosophy: Shape IS Compute |
 | [GRADIENT_TRUTH.md](docs/GRADIENT_TRUTH.md) | No STE. Real gradients. |
 | [TRUE_OCTAVE.md](docs/TRUE_OCTAVE.md) | Multi-resolution: exact + fuzzy |
