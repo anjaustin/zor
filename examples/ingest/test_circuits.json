@@ -1,0 +1,22 @@
+{
+  "creator": "Hand-crafted test circuits (Yosys format)",
+  "modules": {
+    "xor_gate": {
+      "ports": {
+        "a": { "direction": "input", "bits": [2] },
+        "b": { "direction": "input", "bits": [3] },
+        "y": { "direction": "output", "bits": [4] }
+      },
+      "cells": {
+        "xor1": {
+          "type": "$_XOR_",
+          "connections": {
+            "A": [2],
+            "B": [3],
+            "Y": [4]
+          }
+        }
+      }
+    }
+  }
+}
